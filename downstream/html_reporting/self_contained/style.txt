@@ -29,6 +29,19 @@ h2{
     text-align: center;
 }
 
+@media print {
+    body {
+      height:297mm !important;
+      width:210mm !important;
+      margin: 0 !important;
+      font-size: smaller !important;
+    }
+    img { 
+        position: absolute !important;
+        width: 200 !important;
+    }
+  }
+
 @media(min-width:768px){
     .flex-container {
         display: flex;
