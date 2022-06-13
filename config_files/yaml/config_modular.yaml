@@ -1,0 +1,60 @@
+#########################
+# Static tool & environment definition paths
+#########################
+home_dir:
+  /mnt/home/groups/nmrl/cov_analysis/SARS_CoV2_assembly/
+work_dir:
+  /mnt/home/groups/nmrl/cov_analysis/SARS_CoV2_assembly/data/
+
+
+##############
+# cov_assembly
+##############
+kraken2_env:
+  /home/groups/nmrl/cov_analysis/SARS_CoV2_assembly/config_files/conda_defs/kraken2.yaml
+fastp_sif:
+  /home/groups/nmrl/image_files/fastp.sif
+amrpp_repo:
+  /mnt/home/groups/nmrl/bact_analysis/amrplusplus_v2/
+
+##############
+# cov_downstream
+##############
+amrpp_repo:
+  /mnt/home/groups/nmrl/bact_analysis/amrplusplus_v2/
+hamronization_sif:
+  /home/groups/nmrl/image_files/hamronization_latest.sif
+rgi_env:
+  /home/groups/nmrl/cov_analysis/SARS_CoV2_assembly/config_files/conda_defs/rgi_env.yaml
+
+
+#########################
+# cov_assembly configuration
+#########################
+
+###Filled by the wrapper
+assembly_target_files:
+output_directory:
+
+#####################
+# Configuration notes
+#####################
+
+assembly_tool_configs:
+
+
+
+#########################
+# cov_downstream configuration
+#########################
+
+###Filled by the wrapper
+downstream_target_files:
+
+#####################
+# Configuration notes
+#####################
+
+downstream_tool_configs:
+
+

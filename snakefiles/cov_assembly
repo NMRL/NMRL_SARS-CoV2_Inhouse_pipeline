@@ -1,0 +1,196 @@
+localrules: all, output_formatter
+
+#define sample_id_pattern wildcard and accessing sample_sheet
+import pandas as pd
+sip_wild = config['work_dir']+'{sample_id_pattern}_R[1,2]_001.fastq.gz'
+sample_sheet = pd.read_csv(f"{config['output_directory']}sample_sheet.csv")
+
+#AGGREGATION RULE
+rule all:
+    input: 
+        config["assembly_target_files"]
+    run:
+        print('covipipe finished')
+        os.system("""
+            echo Cleaning the workspace
+            mv -n $(find /mnt/home/groups/nmrl/ -type f -name "find_covid19_mutations*") ${reportS_path}${report_path}/
+            rm -f $(find ${base_dir} -maxdepth 2 -type f -name "fastp.json")
+            rm -fr ${temp_path}
+            rm -f $(find ${base_dir} -maxdepth 2 -type f -name "snpEff_genes.txt")
+            rm -f $(find ${base_dir} -maxdepth 2 -type f -name "snpEff_summary.html")
+            rm -f $(find ${base_dir} -maxdepth 2 -type f -name -type f -name ".CF_log")
+        """)
+
+
+rule adapter_removal:
+    input:
+    output:
+    shell:
+    """
+    touch ${temp_path}t_${read_1_arr[-1]}
+    touch ${temp_path}t_${read_2_arr[-1]}
+    singularity run $fastq_sif_path cutadapt -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT -o ${temp_path}t_${read_1_arr[-1]} -p ${temp_path}t_${read_2_arr[-1]} "${read_1_path}" "${read_2_path}" > ${reportS_path}${report_path}/${sample_id}_cutadapt_log.txt
+    """
+# -a - adapter seq to trim on read_1 fastq file
+# -A - adapter seq to trim on read_2 fastq file
+# -o - output path for trimmed read_1 data
+# -p - output path for trimmed read_2 data
+
+
+rule quality_control:
+    input:
+    output:
+    shell:
+    """
+    singularity run $fastq_sif_path fastp -y -p -h ${reportS_path}${report_path}/${sample_id}_fastp_report.html -j ${reportS_path}${report_path}/${sample_id}_fastp.json -i ${temp_path}t_${read_1_arr[-1]} -I ${temp_path}t_${read_2_arr[-1]} -o ${temp_path}qc_${read_1_arr[-1]} -O ${temp_path}qc_${read_2_arr[-1]} -l 50 -q 30
+    """
+# -y - apply low complexity filter for poly-Nt artifacts (ref:https://github.com/OpenGene/fastp#low-complexity-filter for detailed explaination) 
+# -p - display overrepresented sequences in the html report
+# -i/-I - input paths for read_1 & read_2
+# -o/-O - output paths
+# -h - use the provided name to name the html report
+# -l - trim-off the reads less than given length (bp)
+# -q - trim-off the nt less that given phred sassembly in base calling quality (e.g. Q30 = 1/1000 base calling error chance is allowed)
+
+rule read_alignment:
+    input:
+    output:
+    shell:
+    """
+    singularity run $fastq_sif_path bwa mem ${resources}MN908947_3.fa -v 3 ${temp_path}qc_${read_1_arr[-1]} ${temp_path}qc_${read_2_arr[-1]} | singularity run $fastq_sif_path samtools view -bS - | singularity run $fastq_sif_path samtools sort -o ${temp_path}${sample_id}_sorted.bam
+    cp ${temp_path}${sample_id}_sorted.bam ${reportS_path}${report_path}/${sample_id}_sorted.bam
+    """
+# # samtools view
+#     # -b - output as bam file instead of sam file
+#     # -S - outodetect input file format
+# # https://www.biostars.org/p/117225/ - side note on bwa mem - why not to use bwa aln & bowtie2 as primary aligners
+
+rule primer_trimming:
+    input:
+    output:
+    shell:
+    """
+    singularity run $fastq_sif_path samtools index ${temp_path}${sample_id}_sorted.bam
+    singularity run $fastq_sif_path ivar trim -e -b ${resources}QIAseqDIRECTSARSCoV2primersfinal.bed -p ${temp_path}${sample_id}_trimmed.bam -i ${temp_path}${sample_id}_sorted.bam > ${reportS_path}${report_path}/${sample_id}_ivar_log.txt
+    singularity run $fastq_sif_path samtools sort -o ${temp_path}${sample_id}_trimmed_sorted.bam ${temp_path}${sample_id}_trimmed.bam
+    singularity run $fastq_sif_path samtools index ${temp_path}${sample_id}_trimmed_sorted.bam
+    """
+#The command below is used to generate bed file to be used in primer trimming - use for new sets of primers as needed
+# bwa mem -k 5 -T 16 MN908947_3.fa ../QIAseq_SARSCOV2_primers_v3-13.04.2021.fasta | samtools view -b -F 4 > ../QIAseq_SARSCOV2_primers_v3-13.04.2021.bam
+# bedtools bamtobed -i  ../QIAseq_SARSCOV2_primers_v3-13.04.2021.bam > ../QIAseq_SARSCOV2_primers_v3-13.04.2021.bed
+# -k - discard alignment matches shorted than k - improves alignment speed, but should be balanced against aligned seq. length/ref seq type (repeated seq) (e.g. primers of 15bp will have lower optimal value than reads of 150 bp) - default 30
+# -T - alignments with sassemblys lower than T will not be reported (ref: https://arxiv.org/pdf/1303.3997.pdf)
+#QIAseqDIRECTSARSCoV2primersfinal.bed
+#QIAseq_SARSCOV2_primers_v3-13.04.2021.bed
+#SARSCOV2_primers_v4-29.03.2022.bed
+
+# general ref: https://github.com/andersen-lab/paper_2018_primalseq-ivar/blob/master/cookbook/CookBook.ipynb
+# -e - do not discard reads that do not contain primer sequences
+# -b - primer sequences to use in bed format
+
+
+rule indel_realignment:
+    input:
+    output:
+    shell:
+    """
+    echo Performing local realignment
+    mkdir -p ${temp_path}tmpdir #directory required by the abra tool
+    singularity run $fastq_sif_path bedtools bamtobed -i ${temp_path}${sample_id}_trimmed_sorted.bam > ${temp_path}${sample_id}_trimmed_sorted.bed
+    # converting primer-trimmed bam file to bed to use as target regions for local realignment
+    java -jar -Xmx8G ${tool_path}/abra-0.97-SNAPSHOT-jar-with-dependencies_singularity.jar --in ${temp_path}${sample_id}_trimmed_sorted.bam --out ${temp_path}${sample_id}_unsort_markd.bam --ref ${resources}MN908947_3.fa --targets ${temp_path}${sample_id}_trimmed_sorted.bed --working ${temp_path}tmpdir/
+    general ref: https://github.com/mozack/abra
+    """
+
+rule alignment_quality_control:
+    input:
+    output:
+    shell:
+    """
+    echo Counting mapped reads
+    touch ${reportS_path}${report_path}/${sample_id}_mapped_report.txt
+    singularity run $fastq_sif_path samtools flagstat ${temp_path}${sample_id}_sorted.bam > ${reportS_path}${report_path}/${sample_id}_mapped_report.txt
+
+    echo Generating seq_depth file ${sample_id}_seq_depth.txt
+    singularity run $fastq_sif_path samtools sort -o ${temp_path}${sample_id}_markd.bam ${temp_path}${sample_id}_unsort_markd.bam
+    singularity run $fastq_sif_path samtools index ${temp_path}${sample_id}_markd.bam
+    singularity run $fastq_sif_path samtools depth ${temp_path}${sample_id}_markd.bam > ${reportS_path}${report_path}/${sample_id}_seq_depth.txt
+
+    echo Alignment quality control
+    mkdir ${reportS_path}${report_path}/${sample_id}_qualimap
+    singularity run $qualimap_sif_path qualimap bamqc -bam ${temp_path}${sample_id}_markd.bam -outdir ${reportS_path}${report_path}/${sample_id}_qualimap --java-mem-size=4G
+    """
+
+rule variant_calling:
+    input:
+    output:
+    shell:
+    """
+    singularity run $fastq_sif_path freebayes -f ${resources}MN908947_3.fa ${temp_path}${sample_id}_markd.bam | singularity run $fastq_sif_path vcffilter -f "( QUAL > 20 )" AND "( DP > 15 )" > ${temp_path}${sample_id}.vcf
+    cp ${temp_path}${sample_id}.vcf ${reportS_path}${report_path}/${sample_id}.vcf
+    """
+    # vcffilter -f - apply quality & depth filters on vcf file produced by freebayes 
+
+rule variant_annotation:
+    input:
+    output:
+    shell:
+    """
+    java -Xmx8G -jar "${tool_path}/snpEff/snpEff.jar" MN908947 ${temp_path}${sample_id}.vcf > ${temp_path}${sample_id}.ann.vcf
+    """
+
+rule consensus_calling:
+    input:
+    output:
+    shell:
+    """
+    singularity run $fastq_sif_path samtools mpileup -aa -A -d 0 -Q 30 ${temp_path}${sample_id}_markd.bam | singularity run $fastq_sif_path ivar consensus -p ${reportS_path}${report_path}/${sample_id}_consensus.fasta -t 0.5 -m 15 -q 30
+    """
+
+#samtools
+# -aa - add all regions of the reference
+# -A - include sites covered by improperly paired reads
+# -d 0 - do not use upper depth limit to call consensus
+# -Q - base quality phred sassembly
+#ivar
+# -t 0.5 - call variant if supported by at least 0.5 fraction of reads at starting position
+# -m 15 - minimal coverage to call variant
+# -q 30 - consensus base quality sassembly to place in resulting sequence (if less, N is placed)
+#REFS:
+# https://andersen-lab.github.io/ivar/html/manualpage.html
+# http://www.htslib.org/doc/samtools-mpileup.html
+
+
+rule output_formatting:
+    input:
+    output:
+    shell:
+    """
+    mv ${reportS_path}${report_path}/${sample_id}_consensus.fa ${reportS_path}${report_path}/${sample_id}_consensus.fasta
+    bash $(find /mnt/home/groups/nmrl/cov_analysis/fastq_processing/subprocess -type f -name "consensus_headers.sh") ${reportS_path}${report_path}/${sample_id}_consensus.fasta ${sample_id}
+    singularity run $fastq_sif_path python ~/resources/vcf_to_csv_cmd.py ${temp_path}${sample_id}.ann.vcf ${reportS_path}${report_path}/${sample_id}.ann.csv
+    singularity run $fastq_sif_path python ~/resources/depth_plot.py ${reportS_path}${report_path}/${sample_id}_seq_depth.txt ${reportS_path}${report_path}/${sample_id}_seq_depth_plot.html
+    """
+
+
+# The script is used to generate mutation report from demultiplexed, untrimmed fastq file of PE150 Illumina reads obtained in SARS CoV19 WGS experiment.
+now=$(date +"%m_%d_%Y") #to be used later in named report folders
+
+temp_path=$(find ${base_dir} -maxdepth 2 -type d -name "output_temp")/temp_files_${sample_id}/
+reportS_path=$(find ${base_dir} -maxdepth 2 -type d -name "output_final")/
+resources=${base_dir}/resources/
+mkdir -p ${temp_path} #to store temporary files generated by the tools
+
+
+
+
+
+
+
+
+
+
+
+
+
+
