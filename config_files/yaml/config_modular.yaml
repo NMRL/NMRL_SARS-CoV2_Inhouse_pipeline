@@ -43,7 +43,6 @@ output_directory:
 assembly_tool_configs:
 
 
-
 #########################
 # cov_downstream configuration
 #########################
