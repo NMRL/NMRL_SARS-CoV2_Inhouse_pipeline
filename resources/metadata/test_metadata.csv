@@ -1,0 +1,3 @@
+receiving_lab_sample_id,testing_lab,normalized_sample_type,sampling_date
+1000000000,Lab_A,Saliva,2021-02-05
+1000000001,Lab_A,Saliva,2021-02-06
