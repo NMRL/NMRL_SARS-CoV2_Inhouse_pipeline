@@ -15,7 +15,9 @@ fastq_sif:
 processing_env: 
   /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/config_files/conda_defs/local_environment.yml
 assembly_subscripts:
-  /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/subscripts/
+  /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/subscripts/assembly/
+latest_id_file:
+  /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/assembly/current_id
 
 ##############
 # cov_downstream
@@ -34,15 +36,14 @@ fastp_length_filter: 50
 fastp_quality_filter: 30
 
 #bwa (read alignment)
-reference_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/MN908947_3.fa
+reference_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/reference_genomes/sars_cov2/MN908947_3.fa
 bwa_verbose_level: 3
 
 #ivar
 ##primer_trimming
-primer_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/QIAseqDIRECTSARSCoV2primersfinal.bed
-  #/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/QIAseqDIRECTSARSCoV2primersfinal.bed
-  #/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/#QIAseq_SARSCOV2_primers_v3-13.04.2021.bed
-  #/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/#SARSCOV2_primers_v4-29.03.2022.bed
+primer_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/primers/QIAseqDIRECTSARSCoV2primersfinal.bed
+  #/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/primers/QIAseq_SARSCOV2_primers_v3-13.04.2021.bed
+  #/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/primers/SARSCOV2_primers_v4-29.03.2022.bed
 
 ##consensus_calling 
 use_upper_depth_limit: 0 #used by samtools by default (depth above 8000 is diplayed as 8000), not used if 0 is supplied
@@ -55,7 +56,7 @@ abra_jar_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/abra-
 abra_memory_limit_gb: 8
 
 #qualimap (alignment QC)
-qualimap_sif_path: /home/groups/nmrl/image_files/qualimap_latest.sif
+qualimap_sif_path: /mnt/home/groups/nmrl/image_files/qualimap_latest.sif
 qualimap_memory_limit_gb: 4
 
 #freebayes (variant calling)
@@ -68,7 +69,7 @@ snpEff_memory_limit_gb: 8
 snpEff_reference: MN908947
 
 #fastq_screen
-fq_screen_config: /mnt/home/groups/nmrl/db/db-fastq-screen/fastq_screen.conf
+fq_screen_config: db/db-fastq-screen/fastq_screen.conf
 read1_downsample_fraction: 5 #what part of reads will be screened against fqscreen db (expected denominator of a fraction, e.g. if 20% (1/5) of the reads needed, 5 is expected)
 read2_downsample_fraction: 5
 

@@ -1,19 +1,19 @@
-localrules: all, output_formatter
+localrules: all
 
 #define sample_id_pattern wildcard and accessing sample_sheet
-import pandas as pd
+import pandas as pd, re, os
 sip_wild = config['work_dir']+'{sample_id_pattern}_R[1,2]_001.fastq.gz'
 sample_sheet = pd.read_csv(f"{config['output_directory']}sample_sheet.csv")
 
 #AGGREGATION RULE
 rule all:
-    input: 
+    input:
         config["assembly_target_files"]
     run:
         print('assembly finished')
+        
 
-
-rule adapter_removal:
+rule adapter_removal: #ok
     input:
         sif_file = config["fastq_sif"],
         read_1 = config['work_dir']+'{sample_id_pattern}_R1_001.fastq.gz',
@@ -25,13 +25,13 @@ rule adapter_removal:
         read_2 = temp(config['work_dir']+'{sample_id_pattern}_adapter_trimmed_R2.fastq.gz'),
         cutadapt_report = config['output_directory']+'{sample_id_pattern}_cutadapt_log.txt'
     shell:
-        """
+        '''
         touch {output.read_1}
         touch {output.read_2}
-        singularity run {input.sif_file} -a {config[forward_adapter]} -A {config[reverse_adapter]} -o {output.read_1} -p {output.read_2} "{input.read_1}" "{input.read_2}" > {output.cutadapt_report}
-        """
+        singularity run {input.sif_file} cutadapt -a {config[forward_adapter]} -A {config[reverse_adapter]} -o {output.read_1} -p {output.read_2} "{input.read_1}" "{input.read_2}" > {output.cutadapt_report}
+        '''
 
-rule quality_control:
+rule quality_control: #ok
     input:
         sif_file = config["fastq_sif"], 
         read_1 = config['work_dir']+'{sample_id_pattern}_adapter_trimmed_R1.fastq.gz',
@@ -39,8 +39,8 @@ rule quality_control:
     envmodules:
         'singularity'
     output:
-        read_1 = config['output_directory']+'{sample_id_pattern}_quality_filtered_R1.fastq.gz',
-        read_2 = config['output_directory']+'{sample_id_pattern}_quality_filtered_R2.fastq.gz',
+        read_1 = temp(config['output_directory']+'{sample_id_pattern}_quality_filtered_R1.fastq.gz'),
+        read_2 = temp(config['output_directory']+'{sample_id_pattern}_quality_filtered_R2.fastq.gz'),
         fastp_report_html = config['output_directory']+'{sample_id_pattern}_fastp_report.html',
         fastp_report_json = config['output_directory']+'{sample_id_pattern}_fastp_report.json'
     shell:
@@ -49,7 +49,7 @@ rule quality_control:
         """
 
 
-rule read_alignment:
+rule read_alignment: #ok
     input:
         sif_file = config["fastq_sif"], 
         read_1 = config['output_directory']+'{sample_id_pattern}_quality_filtered_R1.fastq.gz',
@@ -57,23 +57,23 @@ rule read_alignment:
     envmodules:
         'singularity'
     output:
-        sorted_bam = config['output_directory']+'{sample_id_pattern}_sorted_bam'
+        sorted_bam = config['output_directory']+'{sample_id_pattern}_sorted.bam'
     shell:
         """
         singularity run {input.sif_file} bwa mem {config[reference_path]} -v {config[bwa_verbose_level]} {input.read_1} {input.read_2} | singularity run {input.sif_file} samtools view -bS - | singularity run {input.sif_file} samtools sort -o {output.sorted_bam}
         """
 
 
-rule primer_trimming:
+rule primer_trimming: #Err
     input:
         sif_file = config["fastq_sif"],
-        sorted_bam = config['output_directory']+'{sample_id_pattern}_sorted_bam'
+        sorted_bam = config['output_directory']+'{sample_id_pattern}_sorted.bam'
     envmodules:
         'singularity'
     output:
         trimmed_bam = temp(config['output_directory']+'{sample_id_pattern}_trimmed.bam'),
-        index_1 = temp(config['output_directory']+'{sample_id_pattern}_trimmed.bam.bai'),
-        sortrimmed_bam = config['output_directory']+'{sample_id_pattern}_trimmed_sorted.bam',
+        index_1 = temp(config['output_directory']+'{sample_id_pattern}_sorted.bam.bai'),
+        sortrimmed_bam = temp(config['output_directory']+'{sample_id_pattern}_trimmed_sorted.bam'),
         index_2 = temp(config['output_directory']+'{sample_id_pattern}_trimmed_sorted.bam.bai'),
         ivar_log = config['output_directory']+'{sample_id_pattern}_ivar_log.txt'
     shell:
@@ -85,7 +85,7 @@ rule primer_trimming:
         """
 
 
-rule indel_realignment:
+rule indel_realignment: #ok
     input:
         sif_file = config["fastq_sif"],
         sortrimmed_bam = config['output_directory']+'{sample_id_pattern}_trimmed_sorted.bam',
@@ -97,35 +97,37 @@ rule indel_realignment:
         realigned_bam = temp(config['work_dir']+'{sample_id_pattern}_unsort_markd.bam')
     shell:
         """
-        mkdir -p {config[work_dir]}tmpdir #directory required by the abra tool
         singularity run {input.sif_file} bedtools bamtobed -i {input.sortrimmed_bam} > {output.sortrimmed_bed}
-        java -jar -Xmx{config[abra_memory_limit_gb]}G {config[abra_jar_path]} --in {input.sortrimmed_bam} --out {output.realigned_bam} --ref config[reference_path] --targets {output.sortrimmed_bed} --working {config[work_dir]}tmpdir/
+        java -jar -Xmx{config[abra_memory_limit_gb]}G {config[abra_jar_path]} --in {input.sortrimmed_bam} --out {output.realigned_bam} --ref {config[reference_path]} --targets {output.sortrimmed_bed} --working {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/
+        rm -r {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/
         """
 
-rule alignment_quality_control:
+
+rule alignment_quality_control: #ok
     input:
         sif_file = config["fastq_sif"],
         qualimap_path = config["qualimap_sif_path"],
-        sorted_raw_bam = config['work_dir']+'{sample_id_pattern}_sorted.bam',
+        sorted_raw_bam = config['output_directory']+'{sample_id_pattern}_sorted.bam',
         realigned_bam = config['work_dir']+'{sample_id_pattern}_unsort_markd.bam'
     output:
         flagstat_report = config['output_directory']+'{sample_id_pattern}_mapped_report.txt',
         sequencing_depth = config['output_directory']+'{sample_id_pattern}_seq_depth.txt',
         sorted_realigned_bam = temp(config['output_directory']+'{sample_id_pattern}_markd.bam'),
-        index = temp(config['output_directory']+'{sample_id_pattern}_markd.bam.bai')
+        index = temp(config['output_directory']+'{sample_id_pattern}_markd.bam.bai'),
+        qualimap_report = config['output_directory']+'{sample_id_pattern}_qualimap/qualimapReport.html'
     envmodules:
         'singularity'
     shell:
         """
-        singularity run {input.sif_file} samtools flagstat {input.sorted_raw_bam} > {output.flagstat_report}
-        singularity run {input.sif_file} samtools sort -o {output.sorted_realigned_bam} {input.realigned_bam}
-        singularity run {input.sif_file} samtools index {output.sorted_realigned_bam}
-        singularity run {input.sif_file} samtools depth {output.sorted_realigned_bam} > {output.sequencing_depth}
-        mkdir {config[output_directory]}{wildcards.sample_id_pattern}_qualimap
+        singularity run {input.sif_file} samtools flagstat {input.sorted_raw_bam} > {output.flagstat_report};
+        singularity run {input.sif_file} samtools sort -o {output.sorted_realigned_bam} {input.realigned_bam};
+        singularity run {input.sif_file} samtools index {output.sorted_realigned_bam};
+        singularity run {input.sif_file} samtools depth {output.sorted_realigned_bam} > {output.sequencing_depth};
+        mkdir -p {config[output_directory]}{wildcards.sample_id_pattern}_qualimap;
         singularity run {input.qualimap_path} qualimap bamqc -bam {output.sorted_realigned_bam} -outdir {config[output_directory]}{wildcards.sample_id_pattern}_qualimap --java-mem-size={config[qualimap_memory_limit_gb]}G
         """
 
-rule variant_calling:
+rule variant_calling: #ok
     input:
         sif_file = config["fastq_sif"],
         sorted_realigned_bam = config['output_directory']+'{sample_id_pattern}_markd.bam'
@@ -135,66 +137,68 @@ rule variant_calling:
         'singularity'
     shell:
         """
-        singularity run {input.sif_file} freebayes -f config[reference_path] {input.sorted_realigned_bam} | singularity run {input.sif_file} vcffilter -f "( QUAL > {config[quality_filter]} )" AND "( DP > {config[coverage_depth_filter]} )" > {output.vcf}
+        singularity run {input.sif_file} freebayes -f {config[reference_path]} {input.sorted_realigned_bam} | singularity run {input.sif_file} vcffilter -f "( QUAL > {config[quality_filter]} )" AND "( DP > {config[coverage_depth_filter]} )" > {output.vcf}
         """ 
 
 
-rule variant_annotation:
+rule variant_annotation: #ok
     input:
         vcf = config['output_directory']+'{sample_id_pattern}.vcf'
     output:
-        annotated_variants = temp(config['output_directory']+'{sample_id_pattern}.ann.vcf')
+        annotated_variants = temp(config['output_directory']+'{sample_id_pattern}.ann.vcf'),
     shell:
         """
         java -Xmx{config[snpEff_memory_limit_gb]}G -jar {config[snpEff_path]} {config[snpEff_reference]} {input.vcf} > {output.annotated_variants}
         """
 
-rule consensus_calling:
+rule consensus_calling: #ok
     input:
+        sif_file = config["fastq_sif"],
         sorted_realigned_bam = config['output_directory']+'{sample_id_pattern}_markd.bam'
     output:
-        consensus_fasta = sorted_realigned_bam = config['output_directory']+'{sample_id_pattern}_consensus.fasta'
+        consensus_fasta = config['output_directory']+'{sample_id_pattern}_consensus.fasta',
+        consensus_qual = temp(config['output_directory']+'{sample_id_pattern}_consensus.qual.txt')
     envmodules:
         'singularity'
     shell:
-        """
-        singularity run {input.sif_file} samtools mpileup -aa -A -d {config[use_upper_depth_limit]} -Q {config[cons_quality_filter]} {input.sorted_realigned_bam} | singularity run {input.sif_file} ivar consensus -p {output.consensus_fasta} -t {config[cons_min_variant_supporting_read_fraction]} -m {config[cons_min_coverage]} -q {config[cons_quality_filter]}
-        sed -i "s/>Consensus_{wildcards.sample_id_pattern}_consensus_threshold_0.5_quality_30/>hCoV-19\/Latvia\/{wildcards.sample_id_pattern}\/$(date +'%Y')/" {output.consensus_fasta} 
-        """
+        '''
+        singularity run {input.sif_file} samtools mpileup -aa -A -d {config[use_upper_depth_limit]} -Q {config[cons_quality_filter]} {input.sorted_realigned_bam} | singularity run {input.sif_file} ivar consensus -p {config[output_directory]}{wildcards.sample_id_pattern}_consensus.fa -t {config[cons_min_variant_supporting_read_fraction]} -m {config[cons_min_coverage]} -q {config[cons_quality_filter]}
+        mv {config[output_directory]}{wildcards.sample_id_pattern}_consensus.fa {output.consensus_fasta}
+        sed -i "s/>Consensus_{wildcards.sample_id_pattern}_consensus_threshold_0.5_quality_30/>hCoV-19\/Latvia\/{wildcards.sample_id_pattern}\/$(date +"%Y")/" {output.consensus_fasta}
+        '''
 
-rule fastq_screening:
+rule fastq_screening: #ok
     input:
         fastq_sceen_sif = '/mnt/home/groups/nmrl/image_files/fastq_screen.sif',
         read_1 = config['work_dir']+'{sample_id_pattern}_R1_001.fastq.gz',
         read_2 = config['work_dir']+'{sample_id_pattern}_R2_001.fastq.gz'
     output:
-        read_1_profile_txt = {config["output_directory"]}+"fastq_screen_results/{sample_id_pattern}_1_screen.txt",
-        read_1_profile_html = {config["output_directory"]}+"fastq_screen_results/{sample_id_pattern}_1_screen.html",
-        read_2_profile_txt = {config["output_directory"]}+"fastq_screen_results/{sample_id_pattern}_2_screen.txt",
-        read_2_profile_html = {config["output_directory"]}+"fastq_screen_results/{sample_id_pattern}_2_screen.html"
+        read_1_profile_txt = config["output_directory"]+"{sample_id_pattern}_1_screen.txt",
+        read_1_profile_html = config["output_directory"]+"{sample_id_pattern}_1_screen.html",
+        read_2_profile_txt = config["output_directory"]+"{sample_id_pattern}_2_screen.txt",
+        read_2_profile_html = config["output_directory"]+"{sample_id_pattern}_2_screen.html"
     envmodules:
         'singularity'
     shell:
         """
-        mkdir -p {config[output_directory]}fastq_screen_results/
+        cd /home/groups/nmrl/
         downsample_r1=$(zcat {input.read_1} | echo $((`wc -l`/(4*{config[read1_downsample_fraction]}))))
         downsample_r2=$(zcat {input.read_2} | echo $((`wc -l`/(4*{config[read2_downsample_fraction]}))))
-        singularity run {input.fastq_sceen_sif} fastq_screen --subset $downsample -conf {config[fq_screen_config]} {input.read_1} --outdir {config[output_directory]}fastq_screen_results/
-        singularity run {input.fastq_sceen_sif} fastq_screen --subset $downsample -conf {config[fq_screen_config]} {input.read_2} --outdir {config[output_directory]}fastq_screen_results/
-        mv {config[output_directory]}fastq_screen_results/{sample_id_pattern}_*R1*_screen.txt" {output.read_1_profile_txt}
-        mv {config[output_directory]}fastq_screen_results/{sample_id_pattern}_*R1*_screen.html" {output.read_1_profile_html}
-        mv {config[output_directory]}fastq_screen_results/{sample_id_pattern}_*R2*_screen.txt" {output.read_2_profile_txt}
-        mv {config[output_directory]}fastq_screen_results/{sample_id_pattern}_*R2*_screen.html" {output.read_2_profile_html}
+        singularity run {input.fastq_sceen_sif} fastq_screen --subset $downsample_r1 -conf {config[fq_screen_config]} {input.read_1} --outdir {config[output_directory]}
+        singularity run {input.fastq_sceen_sif} fastq_screen --subset $downsample_r2 -conf {config[fq_screen_config]} {input.read_2} --outdir {config[output_directory]}
+        mv {config[output_directory]}{wildcards.sample_id_pattern}_*R1*_screen.txt {output.read_1_profile_txt}
+        mv {config[output_directory]}{wildcards.sample_id_pattern}_*R1*_screen.html {output.read_1_profile_html}
+        mv {config[output_directory]}{wildcards.sample_id_pattern}_*R2*_screen.txt {output.read_2_profile_txt}
+        mv {config[output_directory]}{wildcards.sample_id_pattern}_*R2*_screen.html {output.read_2_profile_html}
         """
         
-rule vcf_to_csv:
+rule vcf_to_csv: #ok
     input:
+        sif_file = config["fastq_sif"],
         fastq_sceen_sif = '/mnt/home/groups/nmrl/image_files/fastq_screen.sif',
         annotated_variants = config['output_directory']+'{sample_id_pattern}.ann.vcf'
     output:
         annotated_csv = config['output_directory']+'{sample_id_pattern}.ann.csv'
-    conda:
-        config["processing_env"]
     envmodules:
         'singularity'
     shell:
@@ -202,14 +206,13 @@ rule vcf_to_csv:
         singularity run {input.sif_file} python {config[assembly_subscripts]}vcf_to_csv_cmd.py {input.annotated_variants} {output.annotated_csv}
         '''
 
-rule depth_plot:
+rule depth_plot: #ok
     input:
+        sif_file = config["fastq_sif"],
         fastq_sceen_sif = '/mnt/home/groups/nmrl/image_files/fastq_screen.sif',
         sequencing_depth = config['output_directory']+'{sample_id_pattern}_seq_depth.txt'
     output:
         sequencing_depth_plot = config['output_directory']+'{sample_id_pattern}_seq_depth_plot.html'
-    conda:
-        config["processing_env"]
     envmodules:
         'singularity'
     shell:

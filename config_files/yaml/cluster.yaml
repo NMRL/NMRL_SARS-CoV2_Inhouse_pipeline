@@ -4,8 +4,7 @@
 
 __default__:
   jobname: "default"
-  nodes: 1
-  ppn: 1
+  procs: 1
   pmem: "1000mb"
   walltime: "00:05:00"
   account: "rakus"
@@ -19,10 +18,9 @@ __default__:
 ##############
 adapter_removal:
   jobname: "covipipe.adapter_removal"
-  nodes: 1
-  ppn: 12
+  procs: 12
   pmem: "1500mb"
-  walltime: "00:07:00"
+  walltime: "00:15:00"
   account: "rakus"
   queue: "batch"
   jobout: "oe"
@@ -30,10 +28,9 @@ adapter_removal:
 
 quality_control:
   jobname: "covipipe.quality_control"
-  nodes: 1
-  ppn: 12
+  procs: 12
   pmem: "1500mb"
-  walltime: "00:07:00"
+  walltime: "00:15:00"
   account: "rakus"
   queue: "batch"
   jobout: "oe"
@@ -41,10 +38,9 @@ quality_control:
 
 read_alignment:
   jobname: "covipipe.read_alignment"
-  nodes: 1
-  ppn: 12
+  procs: 12
   pmem: "1500mb"
-  walltime: "00:07:00"
+  walltime: "00:15:00"
   account: "rakus"
   queue: "batch"
   jobout: "oe"
@@ -52,10 +48,9 @@ read_alignment:
 
 primer_trimming:
   jobname: "covipipe.primer_trimming"
-  nodes: 1
-  ppn: 12
+  procs: 12
   pmem: "1000mb"
-  walltime: "00:05:00"
+  walltime: "00:15:00"
   account: "rakus"
   queue: "batch"
   jobout: "oe"
@@ -63,10 +58,9 @@ primer_trimming:
 
 indel_realignment:
   jobname: "covipipe.indel_realignment"
-  nodes: 1
-  ppn: 14
+  procs: 14
   pmem: "1500mb"
-  walltime: "00:07:00"
+  walltime: "00:30:00"
   account: "rakus"
   queue: "batch"
   jobout: "oe"
@@ -74,10 +68,9 @@ indel_realignment:
 
 alignment_quality_control:
   jobname: "covipipe.alignment_quality_control"
-  nodes: 1
-  ppn: 12
+  procs: 12
   pmem: "1500mb"
-  walltime: "00:05:00"
+  walltime: "00:15:00"
   account: "rakus"
   queue: "batch"
   jobout: "oe"
@@ -85,10 +78,9 @@ alignment_quality_control:
 
 variant_calling:
   jobname: "covipipe.variant_calling"
-  nodes: 1
-  ppn: 12
+  procs: 12
   pmem: "1500mb"
-  walltime: "00:05:00"
+  walltime: "00:15:00"
   account: "rakus"
   queue: "batch"
   jobout: "oe"
@@ -96,10 +88,9 @@ variant_calling:
 
 variant_annotation:
   jobname: "covipipe.variant_annotation"
-  nodes: 1
-  ppn: 12
+  procs: 12
   pmem: "1500mb"
-  walltime: "00:07:00"
+  walltime: "00:15:00"
   account: "rakus"
   queue: "batch"
   jobout: "oe"
@@ -107,26 +98,41 @@ variant_annotation:
 
 consensus_calling:
   jobname: "covipipe.consensus_calling"
-  nodes: 1
-  ppn: 8
+  procs: 8
   pmem: "1500mb"
-  walltime: "00:05:00"
+  walltime: "00:15:00"
+  account: "rakus"
+  queue: "batch"
+  jobout: "oe"
+
+fastq_screening:
+  jobname: "covipipe.fastq_screening"
+  procs: 8
+  pmem: "1500mb"
+  walltime: "00:15:00"
   account: "rakus"
   queue: "batch"
   jobout: "oe"
 
 
-
-output_formatting:
-  jobname: "covipipe.output_formatting"
-  nodes: 1
-  ppn: 12
+vcf_to_csv:
+  jobname: "covipipe.vcf_to_csv"
+  procs: 8
   pmem: "1500mb"
-  walltime: "01:00:00"
+  walltime: "00:15:00"
   account: "rakus"
   queue: "batch"
   jobout: "oe"
 
+
+depth_plot:
+  jobname: "covipipe.depth_plot"
+  procs: 8
+  pmem: "1500mb"
+  walltime: "00:15:00"
+  account: "rakus"
+  queue: "batch"
+  jobout: "oe"
 
 ##############
 # cov_downstream

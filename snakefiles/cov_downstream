@@ -1,7 +1,7 @@
 localrules: all, output_formatter
 
 #define sample_id_pattern wildcard and accessing sample_sheet
-import pandas as pd
+import pandas as pd, re
 sip_wild = config['work_dir']+'{sample_id_pattern}_R[1,2]_001.fastq.gz'
 sample_sheet = pd.read_csv(f"{config['output_directory']}sample_sheet.csv")
 
@@ -11,6 +11,7 @@ rule all:
         config["downstream_target_files"]
     run:
         print('downstream finished')
+
 
 
 rule report_data_preparation:

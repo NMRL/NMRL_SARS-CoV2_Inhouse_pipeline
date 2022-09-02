@@ -1,3 +1,0 @@
-chr	start	end	type	IDs	Reads:CO0079	Bases:CO0079
-
-
