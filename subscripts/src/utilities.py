@@ -434,20 +434,6 @@ class Housekeeper:
             if dif_days > valid_days: #if file is older - delete it
                 os.remove(f'./{file}')
 
-    @classmethod
-    def convert_aa_encoding(cls, text:str, three_to_one:bool=True):
-        '''
-        Given text as string, converts between one and three-letter encodings for amino acids and returns the resulting string.
-        Converts 3-letter encoding to 1-letter encoding by default. To convert 1 to 3, set three_to_one=False.
-        '''
-        for pair in cls.aa_encodings: 
-            if three_to_one:
-                text = re.sub(pair[0],pair[1],text) #replace 3-letter codes for 1-letter code in aa_change string
-            else:
-                text = re.sub(pair[1],pair[0],text) #replace 1-letter codes for 3-letter code in aa_change string
-        return text
-
-
 
 class Query_ncbi:
     '''Class is set to contain methods to send requests to ncbi nucleotied database via biopython Entrez API.'''

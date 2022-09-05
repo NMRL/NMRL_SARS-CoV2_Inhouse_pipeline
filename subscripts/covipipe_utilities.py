@@ -1,5 +1,6 @@
 from subscripts.src.utilities import Housekeeper as hk
-import pandas as pd
+import pandas as pd, gzip
+from Bio import SeqIO
 
 class covipipe_housekeeper(hk):
     '''Class extends the standard housekeeper class to implement functions required by specific pipeline'''
@@ -33,4 +34,18 @@ class covipipe_housekeeper(hk):
         Given path to a file and a text string, overwrites the contents of the file with text.
         '''
         with open(path_to_file, "w+") as file: file.write(text)
+
+    
+    @staticmethod
+    def check_fastq_integrity(path_to_file:str):
+        '''
+        Given path to a fastq file returns True if file is intact, otherwise returns False.
+        '''
+        try: 
+            gzip.open(path_to_file, "rt").readlines()
+        except EOFError:
+            return False
+        return True
+
+
 

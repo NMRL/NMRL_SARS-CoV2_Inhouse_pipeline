@@ -82,6 +82,10 @@ output_directory:
 # cov_downstream configuration
 #########################
 
+report_folder_path: /mnt/home/groups/nmrl/cov_analysis/reports
+raw_input_paths: /mnt/home/groups/nmrl/cov_analysis/raw
+mutated_read_percentage_limit: 65
+
 ###Filled by the wrapper
 downstream_target_files:
 
