@@ -1,5 +1,4 @@
-import re, os, pandas as pd
-from Bio import SeqIO
+import re, os, pandas as pd, concurrent.futures
 from subscripts.covipipe_utilities import covipipe_housekeeper as hk
 from subscripts.src.modules import (
     Module, #base pipeline wrapper class
@@ -23,46 +22,58 @@ class Covid_assembly(Module):
     renamed_fastq_file_map = {} #to store original and illumina-formatted fastq file name
     backward_fastq_file_map = {} #storing reversed renamed_fastq_file_map to restore original fastq file names after processing
 
-    def fill_input_dict(self): #extends Module class
-        '''Extends fill_input_dict method of the Module class to run integrity check on fastq files before adding them to the input dictionary.'''
+    def fill_input_dict(self, check_integrity:bool=False): #extends Module class
+        '''
+        Extends fill_input_dict method of the Module class to run integrity check on fastq files before adding them to the input dictionary.
+        The integrity check runs by-default. Set check_integrity = False to avoid it.
+        '''
         super(Covid_assembly, self).fill_input_dict() #running fill_input_dict of Module class - input_dict is filled by all fastq files found in folders and subfolders of input dir
-        with open(f'{self.output_path}input_integrity_check.log', "w+") as logfile: #to log the results of integrity check
-            for fastq in self.input_dict["001.fastq.gz"]: #for all detected fastq files
-                if not hk.check_fastq_integrity(fastq): #if integrity check fails
-                    logfile.write(f'{fastq} FAILED\n') #write to log as failed
-                    if 'R1' in fastq: #if read 1 is corrupted
-                        self.input_dict["001.fastq.gz"].remove(fastq) #remove from further processing
-                        self.input_dict["001.fastq.gz"].remove(fastq.replace("R1", "R2"))
-                    else: #if read 2 is corrupted
-                        self.input_dict["001.fastq.gz"].remove(fastq) #remove from further processing
-                        self.input_dict["001.fastq.gz"].remove(fastq.replace("R2", "R1"))
-                # else: #if integrity intact
-                #     logfile.write(f'{fastq} OK\n') #log as ok and proceed to next file
+        
+        if check_integrity:
+            fastq_total_count = len(self.input_dict["001.fastq.gz"]) #count total fastq found
+            print(f"Performing fastq file integrity check:\n{fastq_total_count} total fastq files.") #announcing to the terminal
+            failed_log_list = [] #to store data about fastq that failed integrity test
+            with concurrent.futures.ProcessPoolExecutor() as executor: #using multiprocessing to speed-up (one check takes about 2.3 sec which translates to about 30 min for 384 nextseq batch using single thread)
+                    results = [executor.submit(hk.check_fastq_integrity, fastq) for fastq in self.input_dict["001.fastq.gz"]] #submitting function calls to different processes
+                    processed_count = 0 #counter for processed samples
+                    for f in concurrent.futures.as_completed(results): #collecting results from different processes
+                        result = f.result() #accessing results
+                        if not result[0]:
+                            failed_log_list.append(f'{result[1]} FAILED\n') #save result as failed to write to log later
+                            if 'R1' in result[1]: #if read 1 is corrupted
+                                self.input_dict["001.fastq.gz"].remove(result[1]) #remove from further processing
+                                self.input_dict["001.fastq.gz"].remove(result[1].replace("R1", "R2"))
+                            else: #if read 2 is corrupted
+                                self.input_dict["001.fastq.gz"].remove(result[1]) #remove from further processing
+                                self.input_dict["001.fastq.gz"].remove(result[1].replace("R2", "R1"))
+                        processed_count += 1 #counting processed files
+                        hk.printProgressBar(processed_count, fastq_total_count, prefix = 'Progress:', suffix = 'Complete', length = 50)
+            with open(f'{self.output_path}input_integrity_check.log', "w+") as logfile: #loggin failed results
+                for record in failed_log_list: logfile.write(f"{record}\n")
+            print(f"Fastq integrity check complete!\n") #report completion
+            if len(failed_log_list) > 0: #if some files have failed
+                print(f"Please check {self.output_path}input_integrity_check.log for details on files that failed.")
+            else: #if no files failed
+                print(f"All fastq files are intact!")
+                            
 
 
     def map_fastq_to_illumina(self):
         '''Generates illumina-format fastq file names for every fastq.gz file found in self.input_path and stores in self.renamed_fastq_file_map and self.backward_fastq_file_map'''
         fastq_path_list = hk.parse_folder(folder_pth_str=self.input_path, file_fmt_str='_[1,2].fastq.gz')
-        prefix_patterns = [r'CO-[0-9]{5}_LVA[0-9]{3}_'] #Eurofins prefixes
-        suffix_patterns = [r'_lib[0-9]{6}'] #Eurofins suffixes
-        for path in fastq_path_list:
-            new_path = path
-            #replace prefix
-            for prefix in prefix_patterns: 
-                if re.search(prefix,new_path).group(0) is not None: #if pattern is detected in file name
-                    new_path = re.sub(prefix,"",new_path) #replace
-                    break #done with prefixes
-            #replace suffix
-            for suffix in suffix_patterns:
-                if re.search(suffix,new_path).group(0) is not None: #if pattern is detected in file name
-                    new_path = re.sub(suffix,"",new_path) #replace
-                    break #done with suffixes
-            #convert fastq part to illumina format
-            if "_1.fastq.gz" in new_path: new_path = new_path.replace("_1.fastq.gz", "_R1_001.fastq.gz") #read_1
-            if "_2.fastq.gz" in new_path: new_path = new_path.replace("_2.fastq.gz", "_R2_001.fastq.gz") #read_2
-            self.renamed_fastq_file_map[path] = new_path #save to forward map
-            self.backward_fastq_file_map[new_path] = path #save to backward map
-
+        fastq_total_count = len(fastq_path_list)
+        if fastq_total_count > 0: #if non-illumina formatted samples present
+            with concurrent.futures.ProcessPoolExecutor() as executor:
+                print(f"Generating illumina format fastq file names:\n{fastq_total_count} total fastq files.") #announcing to the terminal
+                results = [executor.submit(hk.name_formatter, path) for path in fastq_path_list] #submitting function calls to different processes
+                processed_count = 0 #counter for processed samples
+                for f in concurrent.futures.as_completed(results):
+                    result = f.result()
+                    self.renamed_fastq_file_map[result[0]] = result[1]
+                    self.backward_fastq_file_map[result[1]] = result[0]
+                    processed_count += 1
+                    hk.printProgressBar(processed_count, fastq_total_count, prefix = 'Progress:', suffix = 'Complete', length = 50)
+            print(f"Illumina name generation complete!\n") #report completion
 
     def convert_fastq_names(self, to_illumina:bool=True):
         '''
@@ -70,31 +81,61 @@ class Covid_assembly(Module):
         If to_illumina set to False, performs renaming using self.backward_fastq_file_map to restore original file names.
         Creates renaming log files in the self.output_path, indicating succesful and failed renaming attempts.
         '''
+
         if to_illumina: #preprocessing fastq files
-            with open(f'{self.output_path}fastq_forward_renaming.log', "w+") as rename_log: #log renaming process
-                for path in self.renamed_fastq_file_map: 
-                    try: #attempt renaming
-                        os.rename(path, self.renamed_fastq_file_map[path])
-                        rename_log.write(f'{path} {self.renamed_fastq_file_map[path]} OK\n') #log successful renaming
-                    except OSError: #if failed
-                        rename_log.write(f'{path} {self.renamed_fastq_file_map[path]} FAILED:{error}\n') #log renaming error message
+            renaming_logs = []
+            fastq_total_count = len(self.renamed_fastq_file_map)
+            if fastq_total_count > 0:
+                with concurrent.futures.ProcessPoolExecutor() as executor:
+                    print(f"Renaming fastq files to illumina format names:\n{fastq_total_count} total fastq files.") #announcing to the terminal
+                    results = [executor.submit(hk.renamer, path, self.renamed_fastq_file_map[path]) for path in self.renamed_fastq_file_map] #submitting function calls to different processes
+                    processed_count = 0
+
+                    for f in concurrent.futures.as_completed(results):
+                        result = f.result()
+                        renaming_logs.append(result)
+                        processed_count += 1
+                        hk.printProgressBar(processed_count, fastq_total_count, prefix = 'Progress:', suffix = 'Complete', length = 50)
+                print(f"Fastq renaming to Illumina format finished!\n") #report completion
+                with open(f'{self.output_path}fastq_forward_renaming.log', "w+") as rename_log: #log renaming process
+                    for record in renaming_logs: rename_log.write(record)
+                
         else: #restoring names of fastq files to original
-            with open(f'{self.output_path}fastq_backward_renaming.log', "w+") as rename_log:
-                for path in self.backward_fastq_file_map: 
-                    try:
-                        os.rename(path, self.backward_fastq_file_map[path])
-                        rename_log.write(f'{path} {self.backward_fastq_file_map[path]} OK\n')
-                    except OSError as error:
-                        rename_log.write(f'{path} {self.backward_fastq_file_map[path]} FAILED:{error}\n')
+            renaming_logs = []
+            fastq_total_count = len(self.backward_fastq_file_map)
+            if fastq_total_count > 0:
+                with concurrent.futures.ProcessPoolExecutor() as executor:
+                    print(f"Restoring original (non-illumina) fastq file names:\n{fastq_total_count} total fastq files.") #announcing to the terminal
+                    results = [executor.submit(hk.renamer, path, self.backward_fastq_file_map[path]) for path in self.backward_fastq_file_map] #submitting function calls to different processes
+                    processed_count = 0
+
+                    for f in concurrent.futures.as_completed(results):
+                        result = f.result()
+                        renaming_logs.append(result)
+                        processed_count += 1
+                        hk.printProgressBar(processed_count, fastq_total_count, prefix = 'Progress:', suffix = 'Complete', length = 50)
+                print(f"Fastq renaming to original format finished!\n") #report completion
+                with open(f'{self.output_path}fastq_backward_renaming.log', "w+") as rename_log: #log renaming process
+                    for record in renaming_logs: rename_log.write(record)
                 
 
     def restore_annotated_results(self):
         '''Checks if output directory contains annotations log file. If it is there, reads the contents and restores original name of all files according to the log.'''
         if os.path.isfile(f'{self.output_path}result_annotation.log') and os.stat(f'{self.output_path}result_annotation.log').st_size > 0:
             df = pd.read_table(f'{self.output_path}result_annotation.log', sep=" ", header=None)
-            for i, path in enumerate(df[0]):
-                self.backward_result_file_map[str(path)] = str(df[1][i])
-                os.system(f'mv {str(df[1][i])} {str(path)} 2> /dev/null')
+            fastq_total_count = len(df)
+            processed_count = 0
+            with concurrent.futures.ProcessPoolExecutor() as executor:
+                print(f"Removing processing id annotation from output file names for reprocessing:\n{fastq_total_count} total output files.") #announcing to the terminal
+                results = [] 
+                for i, path in enumerate(df[0]):#submitting function calls to different processes
+                    self.backward_result_file_map[str(path)] = str(df[1][i])
+                    results.append(executor.submit(hk.renamer, str(df[1][i]), str(path)))
+
+                for _ in concurrent.futures.as_completed(results):
+                    processed_count += 1
+                    hk.printProgressBar(processed_count, fastq_total_count, prefix = 'Progress:', suffix = 'Complete', length = 50)
+            print(f"Finished removing processing ids for reprocessing!\n") #report completion
 
 
     def compute_processing_ids(self):
@@ -112,7 +153,7 @@ class Covid_assembly(Module):
             for id in self.processing_id_dict:
                 if id in file_path:
                     new_path = re.sub(id, self.processing_id_dict[id], file_path) #adding numbered id
-                    new_path = re.sub(r"(_S[0-9]{1}|_S[0-9]{2}|_S[0-9]{3})", "", new_path) #removing illumina run sample number
+                    new_path = re.sub(r"_S[0-9]*\/", "", new_path) #removing illumina run sample number
                     if 'qualimap' in file_path: #sample id in directory name and directory should be named
                         old_path = os.path.dirname(file_path)
                         new_path = os.path.dirname(new_path)
@@ -124,18 +165,36 @@ class Covid_assembly(Module):
 
     def annotate_processed_files(self):
         '''Renames processed files using self.renamed_result_file_map and creates a renaming log file in the output directory'''
-        with open(f'{self.output_path}result_annotation.log', 'w+') as ann_log: #opening log file for writing
-            if self.backward_result_file_map:
-                for path in self.backward_result_file_map: 
-                    if os.path.isfile(path) or os.path.isdir(path): #if output file or directory exists
-                        ann_log.write(f'{path} {self.backward_result_file_map[path]}\n') #log change
-                        os.system(f'mv {path} {self.backward_result_file_map[path]} 2> /dev/null')
-            else:
-                for path in self.renamed_result_file_map: 
-                    if os.path.isfile(path) or os.path.isdir(path): #if output file or directory exists
-                        ann_log.write(f'{path} {self.renamed_result_file_map[path]}\n') #log change
-                        os.system(f'mv {path} {self.renamed_result_file_map[path]} 2> /dev/null')
+        if self.backward_result_file_map:
+            total_count = len(self.backward_result_file_map)
+            processed_count = 0
+            annotation_logs = []
+            with concurrent.futures.ProcessPoolExecutor() as executor:
+                print(f"Reannotating output files with processing ids:\n{total_count} total output files.") #announcing to the terminal
+                results = [executor.submit(hk.renamer, path, self.backward_result_file_map[path]) for path in self.backward_result_file_map] #submitting function calls to different processes
+                for f in concurrent.futures.as_completed(results):
+                    result = f.result()
+                    annotation_logs.append(result)
+                    processed_count += 1
+                    hk.printProgressBar(processed_count, total_count, prefix = 'Progress:', suffix = 'Complete', length = 50)
+            print(f"Result annotation finished!\n") #report completion
+            with open(f'{self.output_path}result_annotation.log', 'w+') as ann_log: #opening log file for writing  
+                for log in annotation_logs: ann_log.write(log)         
+        else:
+            total_count = len(self.renamed_result_file_map)
+            processed_count = 0
+            annotation_logs = []
+            with concurrent.futures.ProcessPoolExecutor() as executor:
+                print(f"Annotating output files with processing ids:\n{total_count} total output files.") #announcing to the terminal
+                results = [executor.submit(hk.renamer, path, self.renamed_result_file_map[path]) for path in self.renamed_result_file_map] #submitting function calls to different processes
+                for f in concurrent.futures.as_completed(results):
+                    result = f.result()
+                    annotation_logs.append(result)
+                    processed_count += 1
+                    hk.printProgressBar(processed_count, total_count, prefix = 'Progress:', suffix = 'Complete', length = 50)
 
+            with open(f'{self.output_path}result_annotation.log', 'w+') as ann_log: #opening log file for writing  
+                for log in annotation_logs: ann_log.write(log)
 
     def switch_sample_ids(self, new_to_old:bool = False):
         '''
@@ -157,7 +216,7 @@ class Covid_downstream(Module):
 
 
     def read_metadata_table(self):
-        '''Reading metadata table to memeory'''
+        '''Reading metadata table to memory'''
 
 
     def get_sequence_stats(self, path_to_multifasta:str): 
@@ -294,7 +353,7 @@ def run_assembly(args, num_jobs):
     assembly.map_fastq_to_illumina()
     assembly.convert_fastq_names()
     assembly.restore_annotated_results()
-    assembly.fill_input_dict()
+    assembly.fill_input_dict(check_integrity=args.fq_integrity_check)
     assembly.fill_sample_sheet()
     assembly.write_sample_sheet()
     assembly.fill_target_list()

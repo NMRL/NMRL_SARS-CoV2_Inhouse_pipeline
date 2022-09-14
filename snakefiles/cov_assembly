@@ -165,6 +165,7 @@ rule consensus_calling: #ok
         singularity run {input.sif_file} samtools mpileup -aa -A -d {config[use_upper_depth_limit]} -Q {config[cons_quality_filter]} {input.sorted_realigned_bam} | singularity run {input.sif_file} ivar consensus -p {config[output_directory]}{wildcards.sample_id_pattern}_consensus.fa -t {config[cons_min_variant_supporting_read_fraction]} -m {config[cons_min_coverage]} -q {config[cons_quality_filter]}
         mv {config[output_directory]}{wildcards.sample_id_pattern}_consensus.fa {output.consensus_fasta}
         sed -i "s/>Consensus_{wildcards.sample_id_pattern}_consensus_threshold_0.5_quality_30/>hCoV-19\/Latvia\/{wildcards.sample_id_pattern}\/$(date +"%Y")/" {output.consensus_fasta}
+        sed -i -E "s/_S[0-9]*\//\//" {output.consensus_fasta}
         '''
 
 rule fastq_screening: #ok

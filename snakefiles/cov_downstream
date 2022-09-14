@@ -13,6 +13,11 @@ rule all:
         print('downstream finished')
 
 
+rule merge_fasta_files:
+    input:
+    output:
+    shell:
+
 
 rule report_data_preparation:
     input:

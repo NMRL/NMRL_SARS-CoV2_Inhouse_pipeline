@@ -2,6 +2,7 @@
 #IMPORTS
 ##########
 
+from audioop import add
 import sys, os, pandas as pd, re, time, concurrent.futures, subprocess, argparse, shutil, pathlib, filecmp, numpy as np, warnings
 from unittest import result
 from datetime import datetime
@@ -339,62 +340,63 @@ def mapped_info_extractor(file_path):
     return result_row
 
 
-def mutation_report_generator(output_path:str, f_value:float, all_excel_dump_df:pd.DataFrame=None, sequence_stats_df:pd.DataFrame=None, pango_report_path:str=None):
-    """
-    Generate mutation report based on data extracted from pipeline output file for individual samples.
-    """
+def run_extractors_parallel(context_map:dict, filter_list:dict, f_value:float):
+    '''
+    Runs extractor functions using multiprocessing and assembles the results in single dataframe.
+    Returns pandas dataframe. 
+    Contect_map - dictionary that maps file types to file paths, 
+    filter_list - dictionary that maps arbitrary name to mutation name, 
+    f_value - frequency threshold to reduce false-negative mutation detections.
+    '''
 
-####################################
-#EXTRACTING INFORMATION FROM FILES
-####################################
-
-#DETECTING SPECIFIC MUTATIONS FROM FILTERS
+    #DETECTING SPECIFIC MUTATIONS FROM FILTERS
     result_df = pd.DataFrame() #INIT EMPTY DATAFRAME FOR THE REPORT
     with concurrent.futures.ProcessPoolExecutor() as executor: # APPLYING THE EXTRACTOR FUNCTION IN-PARALLEL ON DIFFERENT CORES
-        results = [executor.submit(csv_info_extractor, file_path, filter_list, f_value) for file_path in context_path_map['ann.csv']] #SUBMITTING FUNCTION CALLS TO DIFFERENT PROCESSES
+        results = [executor.submit(csv_info_extractor, file_path, filter_list, f_value) for file_path in context_map['ann.csv']] #SUBMITTING FUNCTION CALLS TO DIFFERENT PROCESSES
         processed_count = 0
         for f in concurrent.futures.as_completed(results): #COLLECTING PROCESSING RESULTS TO THE DATAFRAME
             result_df = result_df.append(f.result(), ignore_index=True) #ADD THE RESULT_ROW TO THE REPORT DF
             processed_count += 1
-            printProgressBar(processed_count, len(context_path_map['ann.csv']), prefix = 'Extracting mutation stats:', suffix = 'Complete', length = 50)
+            printProgressBar(processed_count, len(context_map['ann.csv']), prefix = 'Extracting mutation stats:', suffix = 'Complete', length = 50)
     
 #EXTRACTING COVERAGE DATA
     with concurrent.futures.ProcessPoolExecutor() as executor:
-        results = [executor.submit(depth_info_extractor, file_path) for file_path in context_path_map['seq_depth.txt']] #SUBMITTING FUNCTION CALLS TO DIFFERENT PROCESSES
+        results = [executor.submit(depth_info_extractor, file_path) for file_path in context_map['seq_depth.txt']] #SUBMITTING FUNCTION CALLS TO DIFFERENT PROCESSES
         coverage_df = pd.DataFrame()
         processed_count = 0
         for f in concurrent.futures.as_completed(results): #COLLECTING PROCESSING RESULTS TO THE DATAFRAME
             coverage_df = coverage_df.append(f.result(), ignore_index=True) #ADD THE RESULT_ROW TO THE REPORT DF
             processed_count += 1
-            printProgressBar(processed_count, len(context_path_map['seq_depth.txt']), prefix = 'Extracting coverage stats:', suffix = 'Complete', length = 50)
+            printProgressBar(processed_count, len(context_map['seq_depth.txt']), prefix = 'Extracting coverage stats:', suffix = 'Complete', length = 50)
     result_df = pd.merge(result_df.applymap(str), coverage_df.applymap(str), how="left", on="SAMPLE_ID")
 
 #EXTRACTING MAPPING STATISTICS
     with concurrent.futures.ProcessPoolExecutor() as executor:
-        results = [executor.submit(mapped_info_extractor, file_path) for file_path in context_path_map['mapped_report.txt']] #SUBMITTING FUNCTION CALLS TO DIFFERENT PROCESSES
+        results = [executor.submit(mapped_info_extractor, file_path) for file_path in context_map['mapped_report.txt']] #SUBMITTING FUNCTION CALLS TO DIFFERENT PROCESSES
         mapped_df = pd.DataFrame()
         processed_count = 0
         for f in concurrent.futures.as_completed(results): #COLLECTING PROCESSING RESULTS TO THE DATAFRAME
             mapped_df = mapped_df.append(f.result(), ignore_index=True) #ADD THE RESULT_ROW TO THE REPORT DF
             processed_count += 1
-            printProgressBar(processed_count, len(context_path_map['mapped_report.txt']), prefix = 'Extracting mapping stats:', suffix = 'Complete', length = 50)
+            printProgressBar(processed_count, len(context_map['mapped_report.txt']), prefix = 'Extracting mapping stats:', suffix = 'Complete', length = 50)
 
-
-##################################
-#FORMATTING RESULTS AND METADATA
-##################################
-
-#FORMATTING RESULTING DATAFRAME
+#ASSEMBLING AND FORMATTING RESULT DATAFRAME
     result_df = pd.merge(result_df.applymap(str), mapped_df.applymap(str), how="left", on="SAMPLE_ID")    
     column_reorder_list = ['SAMPLE_ID', 'processing_id'] + list(filter_list.keys()) + ['AVERAGE_COVERAGE', 'MAPPED_FRACTION', 'READS_MAPPED', 'TOTAL_READS', 'MEDIAN_COVERAGE', 'seq_date', 'seq_institution']
     result_df = result_df[column_reorder_list] #REORDERING COLUMNS BASED IN ORDER OF FILTERS IN REPORT_FILTERS.TXT FILE
     result_df.rename(columns={'SAMPLE_ID':"receiving_lab_sample_id"}, inplace=True) #FOR MERGING PURPOSES
 
-#ADDING METADATA AND PANGOLIN LINEAGES
+    return result_df
+
+
+def add_meta_pango(df:pd.DataFrame):
+    '''Adds metadata to the raw result_df produced by extractor runner function. Returns resulting pandas dataframe.'''
+
+    #ADDING METADATA AND PANGOLIN LINEAGES
     if all_excel_dump_df is not None: #IF METADATA MINING OPTION SELECTED - ADD METADATA TO THE MUTATION REPORT
-        result_df = pd.merge(result_df.applymap(str), all_excel_dump_df.applymap(str), how="left", on="receiving_lab_sample_id")
+        df = pd.merge(df.applymap(str), all_excel_dump_df.applymap(str), how="left", on="receiving_lab_sample_id")
     if sequence_stats_df is not None: #IF STATISTICS CALCULATION OPTION SELECTED - ADD SEQUENCE STATISTICS DATA TO THE MUTATION REPORT
-        result_df = pd.merge(result_df.applymap(str), sequence_stats_df.applymap(str), how="left", on="receiving_lab_sample_id")
+        df = pd.merge(df.applymap(str), sequence_stats_df.applymap(str), how="left", on="receiving_lab_sample_id")
     if pango_report_path is not None: #IF PANGOLIN TYPING OPTION SELECTED - ADD PANGOLIN LINEAGE DATA TO THE MUTATION REPORT
         pango_report_df= pd.read_csv(pango_report_path) # READ PANGOLIN REPORT TO A DATAFRAME
         if re.match(r'[A-Z]{2}[0-9]{4}\.B', pango_report_df['taxon'][0]): pango_id_dict = {taxon:taxon for taxon in pango_report_df['taxon']}# MAP TAXOT TO SAMPLE ID IN A DICT
@@ -402,38 +404,65 @@ def mutation_report_generator(output_path:str, f_value:float, all_excel_dump_df:
         else: pango_id_dict = {taxon:taxon.split("_")[1] for taxon in pango_report_df["taxon"]} # MAP TAXON TO SAMPLE ID IN A DICT IF FASTA HEADERS WERE NOT CHANGED
         pango_report_df["receiving_lab_sample_id"] = pango_report_df["taxon"].map(pango_id_dict)
         pango_report_df = pango_report_df[["receiving_lab_sample_id", 'lineage']] #KEEP ONLY LINEAGE MATCHED AGAINST SAMPLE IDS
-        result_df = pd.merge(result_df.applymap(str), pango_report_df.applymap(str), how="left", on="receiving_lab_sample_id")
+        df = pd.merge(df.applymap(str), pango_report_df.applymap(str), how="left", on="receiving_lab_sample_id")
+    return df
 
-#REMOVING DUPLICATED SAMPLES
-    result_df.drop_duplicates(subset=['receiving_lab_sample_id'],inplace=True)
 
-#ADDING STATIC VALUES
-    zero_fill_list = ['sequencing_notes', 'result_notes', 'sub_lineage']
+def add_static_values(df:pd.DataFrame, 
+    zero_fill_list:list = [
+        'sequencing_notes', 
+        'result_notes', 
+        'sub_lineage'
+    ], 
+    static_fill_dict:dict = {
+        'analysis_institution':analysis_institution, 
+        'sequencing_platform':'illumina',
+        'analysis_pipeline':pipeline_string
+    }):
+    '''
+    Given list of columns that are to be filled with 0-s (zero_fill_list)
+    and dictionary of columns that are to be filled with constants (static_fill_dict),
+    fills the columns accordingly. In addition adds special values to rows defined in special case section of the function.
+    Returns pandas dataframe.
+    '''
+
+    #ADDING STATIC VALUES
     static_fill_dict = {
         'analysis_institution':analysis_institution, 
         'sequencing_platform':'illumina',
         'analysis_pipeline':pipeline_string
     }
 
-    for col_name in zero_fill_list: result_df[col_name] = np.zeros(len(result_df['receiving_lab_sample_id']))
+    for col_name in zero_fill_list: df[col_name] = np.zeros(len(df['receiving_lab_sample_id']))
     for col_name in static_fill_dict:
-        result_df.loc[result_df.processing_id != 'Z_BMC', col_name] = static_fill_dict[col_name]    
+        df.loc[df.processing_id != 'Z_BMC', col_name] = static_fill_dict[col_name]    
         # result_df[col_name] = np.chararray(result_df['receiving_lab_sample_id'].shape, itemsize=len(static_fill_dict[col_name])+1).tostring()
     
     #SPECIAL CASE
-    result_df.loc[result_df.processing_id == 'Z_BMC', 'sequencing_platform'] = 'MGI'
-    result_df.loc[result_df.processing_id == 'Z_BMC', 'analysis_institution'] = 'BMC'
+    df.loc[df.processing_id == 'Z_BMC', 'sequencing_platform'] = 'MGI'
+    df.loc[df.processing_id == 'Z_BMC', 'analysis_institution'] = 'BMC'
 
-#EXTRACTING METADATA FROM DIRECTORY STRUCTURE
+    return df
+
+
+def parse_directory_tree(df:pd.DataFrame, report_path:str, raw_folder_path:str):
+    '''
+    Given path to the report folder and raw folder, parses the directory structure to extract relevant metadata.
+    Adds metadata to the df based on receiving_lab_sample_id. Returns tuple of 3 pandas dataframes in order:
+    df - input dataframe annotated with analysis_date & analysis batch; nmrl_samples - dataframe where each analysed
+    sample that was sequenced in NMRL is mapped to its fastq file path (one for each sample); eurofins_samples - 
+    same as nmrl_samples but for samples sequenced in eurofins. 
+    '''
+
     # ANALYSIS_DATE & ANALYSIS_BATCH_ID
     analysis_batch_id = report_path.split('/')[-1]
     analysis_date = analysis_batch_id.split('_')[1]
-    result_df['analysis_date'] = np.chararray(result_df['receiving_lab_sample_id'].shape, itemsize=len(analysis_date)+1).tostring()
-    result_df['analysis_batch_id'] = np.chararray(result_df['receiving_lab_sample_id'].shape, itemsize=len(analysis_batch_id)+1).tostring()
-    result_df.loc[result_df.processing_id != 'Z_BMC', ['analysis_date','analysis_batch_id']] = [analysis_date,analysis_batch_id]
+    df['analysis_date'] = np.chararray(df['receiving_lab_sample_id'].shape, itemsize=len(analysis_date)+1).tostring()
+    df['analysis_batch_id'] = np.chararray(df['receiving_lab_sample_id'].shape, itemsize=len(analysis_batch_id)+1).tostring()
+    df.loc[df.processing_id != 'Z_BMC', ['analysis_date','analysis_batch_id']] = [analysis_date,analysis_batch_id]
 
     #PREPARING FILES TO USE BASH UTILITIES
-    sample_ids = result_df['receiving_lab_sample_id']
+    sample_ids = df['receiving_lab_sample_id']
     sample_ids.to_csv(f'{report_path}/sample_ids.csv',header=False,index=False)
 
     #FINDNG FULL PATHS TO FASTQ FILES USING BASH
@@ -468,10 +497,15 @@ def mutation_report_generator(output_path:str, f_value:float, all_excel_dump_df:
     eurofins_samples.drop_duplicates(subset='id', keep='first', inplace=True)
     nmrl_samples.drop_duplicates(subset='id', keep='first', inplace=True)
 
-#############################################################
-#ADDING EXTRACTED INFO TO THE RESULTS ADN GENERATING REPORT
-#############################################################
-    
+    return df, eurofins_samples, nmrl_samples
+
+
+def add_tree_info(result_df:pd.DataFrame, nmrl_samples:pd.DataFrame, eurofins_samples:pd.DataFrame):
+    '''Given result dataframe, dataframe obtained from paths to samples sequenced in NMRL and
+    dataframe obtained from paths to samples sequences in eurofins, performs data formatting and metadata extraction.
+    Returns result dataframe annotated with run-related metadata.
+    '''
+
     #INIT EMPTY COLUMNS TO STORE INFORMATION
     blanks = ["used_sequencing_run_ids", "used_batch_ids","used_batch_ids", "library_prep_method", "analysis_pipeline_notes"]
     for col_name in blanks: result_df[col_name] = [None for _ in range(len(result_df))]
@@ -528,7 +562,28 @@ def mutation_report_generator(output_path:str, f_value:float, all_excel_dump_df:
                 'analysis_pipeline_notes':analysis_pipeline_notes
                 }
                 for col_name in result_map: result_df.at[result_df.index == i, col_name] = result_map[col_name]
-    
+    return result_df
+
+
+def mutation_report_generator(output_path:str, f_value:float, all_excel_dump_df:pd.DataFrame=None, sequence_stats_df:pd.DataFrame=None, pango_report_path:str=None):
+    """
+    Generate mutation report using helper functions to extract and process metadata and pipeline results.
+    """
+
+#EXTRACTING DATA FROM PIPELINE REPORTS, ADDING METADATA AND PANGO LINEAGES
+    result_df = run_extractors_parallel(context_path_map, filter_list, f_value)
+    result_df = add_meta_pango(result_df)
+    result_df.drop_duplicates(subset=['receiving_lab_sample_id'],inplace=True)
+
+#ADDING STATIC VALUES
+    result_df = add_static_values(result_df)
+
+#EXTRACTING METADATA FROM DIRECTORY STRUCTURE
+    tree_data = parse_directory_tree(result_df, report_path, raw_folder_path)
+    result_df, eurofins_samples, nmrl_samples = tree_data[0], tree_data[1], tree_data[2]
+
+#ADDING EXTRACTED INFO TO THE RESULTS ADN GENERATING REPORT
+    result_df = add_tree_info(result_df, nmrl_samples, eurofins_samples)
     result_df.to_csv(f'{output_path}/{"{0:%Y-%m-%d-%H-%M}".format(datetime.now())}_ft_{f_value}_mutation_report.csv', header=True, index=False, encoding='utf-8-sig') #GENERATING THE REPORT
 
 

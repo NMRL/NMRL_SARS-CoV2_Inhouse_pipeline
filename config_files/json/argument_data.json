@@ -7,7 +7,7 @@
     "optional":{
         "arguments":[
             ["-c", "--config", "Path to the config file (if not supplied, the copy of the template config_modular.yaml will be used).", "./config_files/yaml/config_modular.yaml"],
-            ["-o", "--output_dir", "Path to the output directory where the results will be stored (ardetype_output/ by-default).", "ardetype_output/"],
+            ["-o", "--output_dir", "Path to the output directory where the results will be stored (ardetype_output/ by-default).", "covipipe_output/"],
             ["-n", "--num_jobs", "Maximum number of jobs to be run in-parallel on different nodes of HPC (12 by-default).", 12]
         ],
         "flags":[
@@ -15,7 +15,8 @@
             ["-t", "--dry_run", "Flag to test-run all snakemake rules in all modules (-np option)."],
             ["-f", "--force_all", "Flag to rerun all snakemake rules in all modules (--forceall option)."],
             ["-g", "--rule_graph", "Flag to visualize snakemage job graphs for all modules and save as pdf file (--rulegraph option)."],
-            ["-l", "--clean_job_logs", "Flag to remove all job log files that are older than 30 days."]
+            ["-l", "--clean_job_logs", "Flag to remove all job log files that are older than 30 days."],
+            ["-q", "--fq_integrity_check", "Flag to run the integrity check of the fastq files."]
         ]
     }
 }
