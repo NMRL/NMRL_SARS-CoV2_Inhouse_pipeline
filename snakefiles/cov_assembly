@@ -1,5 +1,3 @@
-localrules: all
-
 #define sample_id_pattern wildcard and accessing sample_sheet
 import pandas as pd, re, os
 sip_wild = config['work_dir']+'{sample_id_pattern}_R[1,2]_001.fastq.gz'
@@ -8,9 +6,15 @@ sample_sheet = pd.read_csv(f"{config['output_directory']}sample_sheet.csv")
 #AGGREGATION RULE
 rule all:
     input:
-        config["assembly_target_files"]
-    run:
-        print('assembly finished')
+        config["assembly_target_files"],
+        multiqc_sif = config['multiqc_sif']
+    envmodules:
+        'singularity'
+    shell:
+        '''
+        echo Sample assembly finished, starting multiqc.
+        singularity run {input.multiqc_sif} multiqc --interactive {config[output_directory]} -o {config[output_directory]}
+        '''
         
 
 rule adapter_removal: #ok
@@ -64,7 +68,7 @@ rule read_alignment: #ok
         """
 
 
-rule primer_trimming: #Err
+rule primer_trimming: #ok
     input:
         sif_file = config["fastq_sif"],
         sorted_bam = config['output_directory']+'{sample_id_pattern}_sorted.bam'

@@ -11,7 +11,9 @@ work_dir:
 # cov_assembly
 ##############
 fastq_sif:
-  /home/groups/nmrl/image_files/fastq_processing.sif
+  /mnt/home/groups/nmrl/image_files/fastq_processing.sif
+multiqc_sif:
+  /mnt/home/groups/nmrl/image_files/fastq_screen.sif
 processing_env: 
   /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/config_files/conda_defs/local_environment.yml
 assembly_subscripts:

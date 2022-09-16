@@ -476,7 +476,7 @@ def run_assembly(args, num_jobs):
         assembly.map_fastq_to_illumina()
         assembly.convert_fastq_names()
         assembly.restore_annotated_results()
-        assembly.fill_input_dict(check_integrity=args.fq_integrity_check)
+        assembly.fill_input_dict(check_integrity=not args.skip_integrity_check)
         assembly.fill_sample_sheet()
         assembly.write_sample_sheet()
         assembly.fill_target_list()
