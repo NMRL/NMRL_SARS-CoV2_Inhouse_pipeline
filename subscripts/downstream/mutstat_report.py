@@ -1,5 +1,5 @@
+#!/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/rbase_env/bin/python
 import pandas as pd, sys, os, datetime, argparse, datetime, re
-
 
 parser = argparse.ArgumentParser(description='A script to calculate mutation statistics given range of dates or list of sample ids.') #argparser object to provide command-line functionality
 parser.add_argument('-d1', '--start_date', metavar='\b', help = 'A starting sequencing date of the reference interval (YYYY-MM-DD).', default=None, required=False)
@@ -141,6 +141,6 @@ total_df = calculate_statistics(file_list)
 if args.name_list is not None:
     report_name = args.name_list.split('/')[-1]
     report_name = report_name[:len(report_name) - 4]
-    total_df.to_csv(f"{out_dir}{datetime.date.today().strftime('%Y-%m-%d')}_{report_name}_mutation_statistics.csv", index=False)
+    total_df.to_csv(f"{out_dir}mutstat_report.csv", index=False)
 else:
-    total_df.to_csv(f"{out_dir}{datetime.date.today().strftime('%Y-%m-%d')}_{date_1}_{date_2} mutation_statistics.csv", index=False)
+    total_df.to_csv(f"{out_dir}mutstat_report.csv", index=False)

@@ -1,14 +1,16 @@
 {
     "description":"This is a wrapper script of COVIPIPE (v.0.0) NGS data processing pipeline.\n\nIt is designed to perform the analysis of paired-end (PE) Sars-CoV2 Illumina reads.\nPipeline is structured in terms of modules. Each module corresponds to a Snakemake script (snakefile) and a python module object.\nSnakefiles are used to define data processing rules. Module class objects store information about inputs and expected outputs for these rules.\nThey also handle file placement operations, module configuration, information transfer between modules,\nand other processes that are not directly involved in running analysis on files. All modules use open-source software.\n\nThe safest option is to run the pipeline using -mode all argument, starting from raw fastq files (illumina format: _R[1,2]_001.fastq.gz).\nHowever, cov_assembly and cov_downstream modules can be run separately, provided that required input files are present in input folder.\n(see config_file/json/module_data.json/module_name/patterns/inputs)",
     "required_arguments":[
-        ["-m", "--mode", "Selecting mode that allows to run specific modules of the pipeline:\nall - run all modules (starting from fastq files)\nassembly - run only cov_assembly module (starting from fastq files)\ndownstream - run only cov_downstream module (starting from fasta & fastq file)."],
-        ["-i", "--input", "Path to directory that contains files to be analysed (files are NOT parsed from subfolders).\nCheck config_files/json/module_data/patterns/inputs section for expected input file extensions for each module)"]
+        ["-m", "--mode", "Selecting mode that allows to run specific modules of the pipeline:\nall - run all modules (starting from fastq files)\nassembly - run only cov_assembly module (starting from fastq files)\ndownstream - run only cov_downstream module (starting from fasta & fastq file)."]
     ],
     "optional":{
         "arguments":[
+            ["-i", "--input", "Path to directory that contains files to be analysed (files are NOT parsed from subfolders).\nCheck config_files/json/module_data/patterns/inputs section for expected input file extensions for each module)", null],
             ["-c", "--config", "Path to the config file (if not supplied, the copy of the template config_modular.yaml will be used).", "./config_files/yaml/config_modular.yaml"],
             ["-o", "--output_dir", "Path to the output directory where the results will be stored (ardetype_output/ by-default).", "covipipe_output/"],
-            ["-n", "--num_jobs", "Maximum number of jobs to be run in-parallel on different nodes of HPC (12 by-default).", 12]
+            ["-n", "--num_jobs", "Maximum number of jobs to be run in-parallel on different nodes of HPC (12 by-default).", 12],
+            ["-d1", "--start_date", "Strating date of the date range that covers samples to be included in downstream analysis.", null],
+            ["-d2", "--end_date", "Ending date of the date range that covers samples to be included in downstream analysis.", null]
         ],
         "flags":[
             ["-s", "--install_snakemake", "Flag to install mamba and snakemake for the current HPC user, if it is not already installed."],
@@ -16,7 +18,11 @@
             ["-f", "--force_all", "Flag to rerun all snakemake rules in all modules (--forceall option)."],
             ["-g", "--rule_graph", "Flag to visualize snakemage job graphs for all modules and save as pdf file (--rulegraph option)."],
             ["-l", "--clean_job_logs", "Flag to remove all job log files that are older than 30 days."],
-            ["-q", "--fq_integrity_check", "Flag to run the integrity check of the fastq files."]
+            ["-q", "--fq_integrity_check", "Flag to run the integrity check of the fastq files."],
+            ["-sp", "--skip_pango", "(Downstream option) Flag to skip pangolin typing when running downstream module."],
+            ["-sh", "--skip_heatmap", "(Downstream option) Flag to skip mutation heatmap update when running downstream module."],
+            ["-sd", "--skip_db_update", "(Downstream option) Flag to skip summary file update when running downstream module."],
+            ["-st", "--skip_tessy", "(Downstream option) Flag to skip tessy report generation when running downstream module."]
         ]
     }
 }

@@ -1,9 +1,0 @@
-1. Extract relevant info from pipeline report
-2. Extract metadata from skpc table
-3. Combine fasta and run pangolin
-4. Run multiqc
-5. Extract specific mutations
-6. Extract fasta metrics
-7. Combine into pipeline report
-
-

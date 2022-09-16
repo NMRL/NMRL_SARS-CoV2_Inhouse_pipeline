@@ -17,4 +17,4 @@ if __name__ == "__main__":
     elif args.mode == 'assembly':
         run_assembly(args,num_jobs)
     elif args.mode == "downstream":
-        run_downstream(args, num_jobs)
+        run_downstream(args)

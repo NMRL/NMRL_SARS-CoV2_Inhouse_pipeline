@@ -133,7 +133,3 @@ depth_plot:
   account: "rakus"
   queue: "batch"
   jobout: "oe"
-
-##############
-# cov_downstream
-##############

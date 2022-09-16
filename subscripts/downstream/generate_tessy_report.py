@@ -1,8 +1,10 @@
+#!/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/rbase_env/bin/python
+
 from docxtpl import DocxTemplate
 import time, pandas as pd, sys, pathlib, datetime
 
 #Import template document + paths to files with data_1 & plots
-template = DocxTemplate('/mnt/home/jevgen01/nmrl/cov_analysis/downstream/tessy_report_template.docx')
+template = DocxTemplate('/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/downstream/tessy_report_template.docx')
 if len(sys.argv) < 2:
     sys.exit('Path to mutation report is required! (mutation_report.py can be used to produce it)')
 
@@ -30,20 +32,23 @@ lineage_data_table=[
     {"num":13,"name":"B.1.620 = B.1.620 (mutations: S477N, E484K, D614G, P681H)","count":len(data[data['lineage'] =='B.1.620'])},
     {"num":14,"name":"B.1.621 = B.1.621 (mutations: R346K, E484K, N501Y, D614G, P681H)","count":len(data[data['lineage'] =='B.1.621'])},
     {"num":15,"name":"BA.1 = BA.1 or B.1.1.529 with mutations del69-70, ins214EPE, S371L, G496S, T547K","count":len(data.loc[(data['lineage'].str.contains('BA.1')) | (data['lineage'] == 'B.1.1.529') & (data['A67_V70delinsVI'] == "1.0") & (data['214EPEins'] == '1.0') & (data['S371L'] == "1.0") & (data['G496S'] == '1.0') & (data['T547K'] == '1.0')])},
-    {"num":16,"name":"BA.2 = BA.2 or B.1.1.529 with mutations V213G, T376A, R408S","count":len(data.loc[(data['lineage'].str.contains('BA.2')) | (data['lineage'] == 'B.1.1.529') & (data['V213G'] == "1.0") & (data['T376A'] == '1.0') & (data['R408S'] == "1.0")])},
+    {"num":16,"name":"BA.2 = BA.2 or B.1.1.529 with mutations V213G, T376A, R408S","count":len(data.loc[(data['lineage'].str.contains('BA.2')) & ~(data['lineage'].str.contains('BA.2.75')) | (data['lineage'] == 'B.1.1.529') & (data['V213G'] == "1.0") & (data['T376A'] == '1.0') & (data['R408S'] == "1.0")])},
     {"num":17,"name":"BA.3 = BA.3 or B.1.1.529 with mutations del69-70, ORF1a:A3657V, ORF3a:T22V","count":len(data.loc[(data['lineage'].str.contains('BA.3')) | (data['lineage'] == 'B.1.1.529') & (data['A67_V70delinsVI'] == "1.0") & (data['A3657V'] == '1.0') & (data['T22V'] == "1.0")])},
-    {"num":18,"name":"C.37 = C.37 (mutations L452Q, F490S, D614G)","count":len(data[data['lineage'] =='C.37'])},
-    {"num":19,"name":"CLUSTER_5 = Denmark cluster 5 associated with mink (defined by mutations: del 69-70, Y453F, I692V, M1229I)","count":0},
-    {"num":20,"name":"E484K = detected via an SNP assay specific for E484K","count":0},
-    {"num":21,"name":"N501Y = detected via an SNP assay specific for N501Y","count":0},
-    {"num":22,"name":"ORF1a(del3675-3677) = Variants carrying ORF1a deletion (del 3675-3677)","count":0},
-    {"num":23,"name":"P.1 = P.1 variants (L18F, T20N, P26S, D138Y, R190S, K417T, E484K, N501Y, H655Y, T1027I, V1176F)","count": len(data[data['lineage'] =='P.1'])},
-    {"num":24,"name":"P.3 = P.3 (mutations:E484K, N501Y, D614G, P681H)","count":len(data[data['lineage'] =='P.3'])},
-    {"num":25,"name":"S_GENE_DELETION = Variant virus with deletion in S-gene (defined by mutation: del 69-70 or by negative S-gene RT-PCR)","count":0},
-    {"num":26,"name":"UNK = Sequence information unknown or not available","count":len(data[data['lineage'] =='None'])},
-    {"num":27,"name":"VARIANT_OTHER = Novel variant of potential concern. Provide details in VirusVariantOther","count":0},
-    {"num":28,"name":"WILD_TYPE = None of the variants described for this variable","count":0},
-    {"num":29,"name":"Y453F = Y453F associated with farmed minks; defined by mutation: Y453F","count":0}
+    {"num":18,"name":"BA.2.75 = BA.2 sub-lineage with mutations D339H, G446S, N460K, and R493Q in the RBD, and mutations K147E, W152R, F157L, I210V, and G257S in the N-terminal domain of the Spike protein", "count":len(data.loc[(data['lineage'].str.contains('BA.2.75'))])},
+    {"num":19,"name":"BA.4 or B.1.1.529 with mutations L452R, F486V, del69-70, NSP7b: L11F, N: P151S, ORF1a: Δ141-143","count":len(data.loc[(data['lineage'].str.contains('BA.4'))])},
+    {"num":20,"name":"BA.5 = BA.5 or B.1.1.529 with mutations L452R, F486V, del69-70","count":len(data.loc[(data['lineage'].str.contains('BA.5')) | (data['lineage'].str.contains('BF.')) | (data['lineage'].str.contains('BE.'))])},
+    {"num":21,"name":"C.37 = C.37 (mutations L452Q, F490S, D614G)","count":len(data[data['lineage'] =='C.37'])},
+    {"num":22,"name":"CLUSTER_5 = Denmark cluster 5 associated with mink (defined by mutations: del 69-70, Y453F, I692V, M1229I)","count":0},
+    {"num":23,"name":"E484K = detected via an SNP assay specific for E484K","count":0},
+    {"num":24,"name":"N501Y = detected via an SNP assay specific for N501Y","count":0},
+    {"num":25,"name":"ORF1a(del3675-3677) = Variants carrying ORF1a deletion (del 3675-3677)","count":0},
+    {"num":26,"name":"P.1 = P.1 variants (L18F, T20N, P26S, D138Y, R190S, K417T, E484K, N501Y, H655Y, T1027I, V1176F)","count": len(data[data['lineage'] =='P.1'])},
+    {"num":27,"name":"P.3 = P.3 (mutations:E484K, N501Y, D614G, P681H)","count":len(data[data['lineage'] =='P.3'])},
+    {"num":28,"name":"S_GENE_DELETION = Variant virus with deletion in S-gene (defined by mutation: del 69-70 or by negative S-gene RT-PCR)","count":0},
+    {"num":29,"name":"UNK = Sequence information unknown or not available","count":len(data[data['lineage'] =='None'])},
+    {"num":30,"name":"VARIANT_OTHER = Novel variant of potential concern. Provide details in VirusVariantOther","count":0},
+    {"num":31,"name":"WILD_TYPE = None of the variants described for this variable","count":0},
+    {"num":32,"name":"Y453F = Y453F associated with farmed minks; defined by mutation: Y453F","count":0}
 ]
 
 cur_year = datetime.date.today().isocalendar()[0]

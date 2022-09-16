@@ -1,5 +1,7 @@
-import re, os, pandas as pd, concurrent.futures
+import re, os, pandas as pd, concurrent.futures, subprocess, sys
+from datetime import datetime
 from subscripts.covipipe_utilities import covipipe_housekeeper as hk
+from subscripts.downstream.pipeline_report import copy_files_parallel
 from subscripts.src.modules import (
     Module, #base pipeline wrapper class
     module_data, #module metadata 
@@ -15,12 +17,15 @@ from subscripts.src.modules import (
 
 class Covid_assembly(Module):
     '''Class extends Module and implements pipeline-specific file processing methods'''
-    latest_processing_id = None #latest processing id read from file
-    processing_id_dict = {} #to map processing ids to original ids for the current batch of samples
-    renamed_result_file_map = {} #to map file paths annotated with processing ids and with run id removed to the raw file paths
-    backward_result_file_map = {} #to map file restored annotated paths to specific annotated path
-    renamed_fastq_file_map = {} #to store original and illumina-formatted fastq file name
-    backward_fastq_file_map = {} #storing reversed renamed_fastq_file_map to restore original fastq file names after processing
+
+    def __init__(self, *args, **kwargs):
+        super(Covid_assembly, self).__init__(*args, **kwargs) #extending parent init method
+        self.latest_processing_id = None #latest processing id read from file
+        self.processing_id_dict = {} #to map processing ids to original ids for the current batch of samples
+        self.renamed_result_file_map = {} #to map file paths annotated with processing ids and with run id removed to the raw file paths
+        self.backward_result_file_map = {} #to map file restored annotated paths to specific annotated path
+        self.renamed_fastq_file_map = {} #to store original and illumina-formatted fastq file name
+        self.backward_fastq_file_map = {} #storing reversed renamed_fastq_file_map to restore original fastq file names after processing
 
     def fill_input_dict(self, check_integrity:bool=False): #extends Module class
         '''
@@ -140,8 +145,8 @@ class Covid_assembly(Module):
 
     def compute_processing_ids(self):
         '''Calculates a range of processing ids for current batch of samples and stores it in self.processing_id_dict'''
-        latest_processing_id = hk.read_plaintext_file(self.config_file['latest_id_file'])[0] #reading latest id
-        processing_id_list = [latest_processing_id[:3]+str(int(latest_processing_id[3:])+i+1).zfill(6) for i in range(len(self.sample_sheet['sample_id']))] #generating processing ids
+        self.latest_processing_id = hk.read_plaintext_file(self.config_file['latest_id_file'])[0] #reading latest id
+        processing_id_list = [self.latest_processing_id[:3]+str(int(self.latest_processing_id[3:])+i+1).zfill(6) for i in range(len(self.sample_sheet['sample_id']))] #generating processing ids
         self.processing_id_dict = {ids[0]:f'{ids[1]}_{ids[0]}' for ids in zip(list(self.sample_sheet['sample_id']),processing_id_list)} #generating numbered ids
         if not self.backward_result_file_map:
             hk.overwrite_plaintext_file(self.config_file['latest_id_file'],processing_id_list[-1]) #updating processing id after range of ids was used 
@@ -196,6 +201,7 @@ class Covid_assembly(Module):
             with open(f'{self.output_path}result_annotation.log', 'w+') as ann_log: #opening log file for writing  
                 for log in annotation_logs: ann_log.write(log)
 
+
     def switch_sample_ids(self, new_to_old:bool = False):
         '''
         Replaces sample_id column in self.sample_sheet with ids that contain processing number and lack run number.
@@ -209,125 +215,241 @@ class Covid_assembly(Module):
             self.sample_sheet = hk.map_replace_column(self.sample_sheet, temp_dict, 'sample_id', 'sample_id')
 
 
-class Covid_downstream(Module):
-    '''Class extends Module and implements pipeline-specific downstream processing methods'''
-    metadata_table = None #To store SPKC metadata
-    sequence_stats_table = None #To store statistics computed from consensus sequences
+class Covid_downstream():
+    '''Class implements pipeline-specific downstream processing methods'''
+
+    def __init__(self, start_date:str, end_date:str, skip_pango:bool, skip_heatmap:bool, skip_db_update:bool, skip_tessy:bool):
+
+        #command-line arguments
+        self.start_date = start_date
+        self.end_date = end_date
+        self.skip_pango = skip_pango
+        self.skip_heatmap = skip_heatmap
+        self.skip_db_update = skip_db_update
+        self.skip_tessy = skip_tessy
+
+        #static paths
+        self.report_folder_path = "/mnt/home/groups/nmrl/cov_analysis/reports/"
+        self.mutation_file_folder = "/mnt/home/groups/nmrl/cov_analysis/mutation_heatmap/mutation_files/"
+        self.pipe_report_script = "/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/subscripts/downstream/pipeline_report.py"
+        self.mutstat_report_script = "/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/subscripts/downstream/mutstat_report.py"
+        self.tessy_report_script = "/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/subscripts/downstream/generate_tessy_report.py"
+        self.heatmap_update_script = "/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/subscripts/downstream/update_heatmap_job.sh"
+        self.weekly_report_script = "/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/subscripts/downstream/run_papermill.sh"
+        self.summary_file_script = "/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/subscripts/downstream/update_database_file.py"
+        self.log_folder_path = "/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/covipipe_job_logs/"
+        self.papermill_path = "/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/rbase_env/bin/papermill"
+
+        #operational variables
+        self.current_summary_file = None
+        self.pipeline_report_path = None
+        self.filtered_report_path = None
+        self.mutstat_report_path = None
 
 
-    def read_metadata_table(self):
-        '''Reading metadata table to memory'''
-
-
-    def get_sequence_stats(self, path_to_multifasta:str): 
+    def generate_pipeline_report(self):
         '''
-        Given path to multifasta, uses calculates GC content, N content and sequence length for each sequence.
-        Fills sequence.sequence_stats_table with this data.
+        Runs subscripts/downstream/pipeline_report.py script with arguments passed to the main script (date range or sample_id list).
+        Saves path to the report file to self.pipeline_report_path and path to the report folder to self.report_folder_path.
         '''
+        log_path = f'{self.log_folder_path}{datetime.now().strftime("%Y-%m-%d-%H-%M")}_covipipe_report.log'
+        print('Generating pipeline report.')
+        try:
+            with open(log_path, 'w+') as log_file:
+                log_file.write(self.pipe_report_script+" -d1 "+self.start_date+" -d2 "+self.end_date)
+                command = [f'{self.pipe_report_script}', "-d1", self.start_date, "-d2", self.end_date]
+                if self.skip_pango:
+                    print('Pangolin typing skipped, assuming report files exist.')
+                    command.append('-s')
+                    subprocess.check_call(command, stdout=log_file, stderr=log_file)
+                else: 
+                    subprocess.check_call(command, stdout=log_file, stderr=log_file)
+        except subprocess.CalledProcessError:
+            sys.exit(f'Pipeline report generation failed\nSee {log_path} for details')
+        self.report_folder_path = f"{self.report_folder_path}report_{datetime.today().date().strftime('%Y-%m-%d')}_{self.start_date}_{self.end_date}"
+        self.pipeline_report_path = f"{self.report_folder_path}/pipeline_report.csv"
 
 
-    def extract_specific_mutations(self, path_to_filter_file:str):
-        '''Extracts mutation data from an annotated and csv-converted vcf file generated by the pipeline. Returns a dictionary where each mutation is maped to 0(not found) or 1 (found)'''
+    def filter_pipeline_report(self):
+        '''
+        Reads report file from self.pipeline_report_path, filters the dataframe and saves as new file under report_folder_path.
+        Saves path to the filtered report file to self.filtered_report_path.
+        '''
+        print('Filtering pipeline report.')
+        df = pd.read_csv(self.pipeline_report_path)
+        df = df[(df['genome_N_percentage'] <= 10) & (df['lineage'] != "Unassigned")]
+        self.filtered_report_path = f'{self.report_folder_path}/filtered_pipeline_report.csv'
+        df.to_csv(self.filtered_report_path, header=True, index=False)
 
 
-    def extract_coverage_depth(self, path_to_flagstat_report:str):
-        '''Extracts median coverage and average coverage from samtools flagstat report. Returns tuple (median_cov:float, average_cov:float)'''
+    def generate_mutstat_report(self):
+        '''
+        Runs subscripts/downstream/mutstat_report.py script with arguments passed to the main script (date range or sample_id list).
+        Saves path to the mutstat report to self.mutstat_report_path.
+        '''
+        print('Generating mutation-by-gene count report.')
+        log_path = f'{self.log_folder_path}{datetime.now().strftime("%Y-%m-%d-%H-%M")}_mutstat_report.log'
+        command = [self.mutstat_report_script, "-l", self.filtered_report_path, "-o", self.report_folder_path]
+        try:
+            with open(log_path, 'w+') as log_file:
+                log_file.write(" ".join(command))
+                subprocess.check_call(command, stdout=log_file, stderr=log_file)
+        except subprocess.CalledProcessError:
+            sys.exit(f'Mutstat report generation failed\nSee {log_path} for details')
+        self.mutstat_report_path = f"{self.report_folder_path}/mutstat_report.csv"
 
 
+    def update_summary_file(self):
+        '''
+        Runs subscripts/downstream/update_database_file.py script with arguments passed to the main script (date range or sample_id list).
+        '''
+        if not self.skip_db_update:
+            log_path = f'{self.log_folder_path}{datetime.now().strftime("%Y-%m-%d-%H-%M")}_summary_update.log'
+            print(f'Updating summary file.')
+            command = [f'{self.summary_file_script}', "-p", self.pipeline_report_path]
+            try:
+                with open(log_path, 'w+') as log_file:
+                    log_file.write(" ".join(command))
+                    subprocess.check_call(command, stdout=log_file, stderr=log_file)
+            except subprocess.CalledProcessError:
+                sys.exit(f'Summary file update failed\nSee {log_path} for details')
+        else:
+            print(f'Summary file update skipped, assuming the file is up-to-date.')
+        self.current_summary_file = [f'/mnt/home/groups/nmrl/cov_analysis/analysis_history/{file}' for file in os.listdir('/mnt/home/groups/nmrl/cov_analysis/analysis_history/') if 'summary_file' in file][0]
 
 
-###############################################
+    def copy_mutation_files(self):
+        '''
+        Copies all .ann.csv files from self.report_folder_path/source_files/ to self.mutation_file_folder.
+        '''
+        path_list = [f'{self.report_folder_path}/source_files/{file}' for file in os.listdir(f'{self.report_folder_path}/source_files') if ".ann.csv" in file]
+        print(f'Copying annotated variant files to {self.mutation_file_folder}')
+        copy_files_parallel(path_list, self.mutation_file_folder, progress_bar=False)
+
+
+    def update_mut_heatmap(self):
+        '''
+        Runs subscripts/downstream/update_heatmap_job.sh script with arguments passed to the main script (date range or sample_id list).
+        '''
+        if not self.skip_heatmap:
+            print('Submitting job to HPC to update heatmap plot.')
+            log_path = f'{self.log_folder_path}{datetime.now().strftime("%Y-%m-%d-%H-%M")}_heatmap_update.log'
+            command = ['qsub', "-o", log_path, "-e", log_path, self.heatmap_update_script]
+            try:
+                with open(log_path, 'w+') as log_file:
+                    log_file.write(" ".join(command))
+                    subprocess.check_call(command, stdout=log_file, stderr=log_file)
+            except subprocess.CalledProcessError:
+                sys.exit(f'Summary file update failed\nSee {log_path} for details')
+        else:
+            print(f'Heatmap update skipped, assuming the heatmap is up-to-date.')
+
+
+    def generate_weekly_report(self):
+        '''
+        Runs subscripts/downstream/report.py script with arguments passed to the main script (date range or sample_id list).
+        '''
+        print('Generating weekly report.')
+        log_path = f'{self.log_folder_path}{datetime.now().strftime("%Y-%m-%d-%H-%M")}_weekly_report.log'
+        command = [self.weekly_report_script, self.current_summary_file, self.filtered_report_path, self.mutstat_report_path, self.report_folder_path+"/", self.filtered_report_path, f"{self.report_folder_path}/report_notebook.ipynb"]
+        try:
+            with open(log_path, 'w+') as log_file:
+                log_file.write(" ".join(command))
+                subprocess.check_call(command, stdout=log_file, stderr=log_file)
+        except subprocess.CalledProcessError:
+            sys.exit(f'Weekly report generation failed\nSee {log_path} for details')
+
+
+    def generate_tessy_report(self):
+        '''
+        Runs subscripts/downstream/generate_tessy_report.py script with arguments passed to the main script (date range or sample_id list).
+        '''
+        if not self.skip_tessy:
+            print('Generating TESSY report.')
+            log_path = f'{self.log_folder_path}{datetime.now().strftime("%Y-%m-%d-%H-%M")}_tessy_report.log'
+            command = [self.tessy_report_script, self.filtered_report_path]
+            try:
+                with open(log_path, 'w+') as log_file:
+                    log_file.write(" ".join(command))
+                    subprocess.check_call(command, stdout=log_file, stderr=log_file)
+            except subprocess.CalledProcessError:
+                sys.exit(f'TESSY report generation failed\nSee {log_path} for details')
+        else:
+             sys.exit(f'TESSY report generation skipped.')
+
+
+################################################
 # Defining wrapper functions to call from main
-###############################################
-
+################################################
 
 
 def run_all(args, num_jobs):
     '''Wrapper function to run all modules sequentially.'''
     assembly = Covid_assembly(
-            module_name='assembly',
-            input_path=args.input,
-            module_config=args.config,
-            output_path=args.output_dir,
-            run_mode=args.submit_modules,
-            dry_run=args.dry_run,
-            force_all=args.force_all,
-            rule_graph=args.rule_graph,
-            pack_output=args.pack_output,
-            unpack_output=args.unpack_output,
-            job_name=module_data['assembly']['job_name'],
-            patterns=module_data['assembly']['patterns'],
-            targets=module_data['assembly']['targets'],
-            requests=module_data['assembly']['requests'],
-            snakefile_path=module_data['snakefiles']['assembly'],
-            cluster_config_path=module_data['cluster_config']
-            )
-
-    downstream = Covid_downstream(
-        module_name='downstream', 
-        input_path=assembly.output_path, 
-        module_config=assembly.config_file, 
-        output_path=args.output_dir, 
-        run_mode=args.submit_modules,
+        module_name='assembly',
+        input_path=args.input,
+        module_config=args.config,
+        output_path=args.output_dir,
+        run_mode=None,
         dry_run=args.dry_run,
         force_all=args.force_all,
         rule_graph=args.rule_graph,
-        pack_output=args.pack_output,
-        unpack_output=args.unpack_output,
-        job_name=module_data['downstream']['job_name'],
-        patterns=module_data['downstream']['patterns'],
-        targets=module_data['downstream']['targets'],
-        requests=module_data['downstream']['requests'],
-        snakefile_path=module_data['snakefiles']['downstream'],
+        pack_output=None,
+        unpack_output=None,
+        job_name=module_data['assembly']['job_name'],
+        patterns=module_data['assembly']['patterns'],
+        targets=module_data['assembly']['targets'],
+        requests=module_data['assembly']['requests'],
+        snakefile_path=module_data['snakefiles']['assembly'],
         cluster_config_path=module_data['cluster_config']
-        )
+    )
 
-    #Running assembly
-    assembly.fill_input_dict()
-    assembly.fill_sample_sheet()
-    if assembly.unfold_output: assembly.unfold_output()
-    assembly.make_output_dir()
-    assembly.write_sample_sheet()
-    assembly.fill_target_list()
-    assembly.add_module_targets()
-    assembly.add_output_dir()
-    assembly.write_module_config()
-    assembly.files_to_wd()
-    try:
-        assembly.run_module(job_count=num_jobs)
-    except Exception as e:
-        assembly.clear_working_directory() #to avoid manually moving files back to input
-        raise e
-    assembly.check_module_output()
-    assembly.write_sample_sheet()
-    assembly.clear_working_directory()
+    downstream = Covid_downstream(
+        start_date=args.start_date,
+        end_date=args.end_date,
+        skip_pango = args.skip_pango,
+        skip_heatmap = args.skip_heatmap,
+        skip_db_update = args.skip_db_update,
+        skip_tessy = args.skip_tessy
+    )
 
-    #Connecting assembly to downstream
-    downstream.receive_sample_sheet(assembly.supply_sample_sheet())
-    if downstream.dry_run == "" and downstream.rule_graph == "": 
-        samples_cleared = downstream.remove_invalid_samples(connect_from_module_name='assembly') #in dry run mode none of the rules are executed, hence all samples will be removed, causing error
-        downstream.save_removed()
-        if samples_cleared == 1: 
-            if assembly.pack_output: assembly.fold_output()
-            raise Exception('Missing files requested by downstream')
+    if assembly.input_path:
+        #Running assembly
+        assembly.fill_input_dict()
+        assembly.fill_sample_sheet()
+        if assembly.unfold_output: assembly.unfold_output()
+        assembly.make_output_dir()
+        assembly.write_sample_sheet()
+        assembly.fill_target_list()
+        assembly.add_module_targets()
+        assembly.add_output_dir()
+        assembly.write_module_config()
+        assembly.files_to_wd()
+        try:
+            assembly.run_module(job_count=num_jobs)
+        except Exception as e:
+            assembly.clear_working_directory() #to avoid manually moving files back to input
+            raise e
+        assembly.check_module_output()
+        assembly.write_sample_sheet()
+        assembly.clear_working_directory()
+    else:
+        print(f'Skipping assembly as path to a folder containing fastq files (-i argument) was not supplied.')
 
+
+    if (downstream.start_date and downstream.end_date):
     #Running downstream
-    downstream.fill_input_dict()
-    downstream.add_fasta_samples()
-    downstream.write_sample_sheet()
-    downstream.fill_target_list()
-    downstream.add_module_targets()
-    downstream.write_module_config()
-    downstream.files_to_wd()
-    try:
-        downstream.run_module(job_count=num_jobs)
-    except Exception as e:
-        downstream.clear_working_directory()
-        raise e
-    downstream.check_module_output()
-    downstream.write_sample_sheet()
-    downstream.clear_working_directory()
-
+        downstream.generate_pipeline_report()
+        downstream.filter_pipeline_report()
+        downstream.generate_mutstat_report()
+        downstream.update_summary_file()
+        downstream.copy_mutation_files()
+        downstream.update_mut_heatmap()
+        downstream.generate_weekly_report()
+        downstream.generate_tessy_report()
+    else:
+        sys.exit(f'Skipping downstream as start-end dates (-d1; -d2) arguments were not supplied')
+    
 
 def run_assembly(args, num_jobs):
     '''Wrapper function to run only assembly module.'''
@@ -349,31 +471,34 @@ def run_assembly(args, num_jobs):
         snakefile_path=module_data['snakefiles']['assembly'],
         cluster_config_path=module_data['cluster_config']
     )
-    assembly.make_output_dir()
-    assembly.map_fastq_to_illumina()
-    assembly.convert_fastq_names()
-    assembly.restore_annotated_results()
-    assembly.fill_input_dict(check_integrity=args.fq_integrity_check)
-    assembly.fill_sample_sheet()
-    assembly.write_sample_sheet()
-    assembly.fill_target_list()
-    assembly.add_module_targets()
-    assembly.add_output_dir()
-    assembly.write_module_config()
-    assembly.files_to_wd()
-    try:
-        assembly.run_module(job_count=num_jobs)
-    except Exception as e:
+    if assembly.input_path:
+        assembly.make_output_dir()
+        assembly.map_fastq_to_illumina()
+        assembly.convert_fastq_names()
+        assembly.restore_annotated_results()
+        assembly.fill_input_dict(check_integrity=args.fq_integrity_check)
+        assembly.fill_sample_sheet()
+        assembly.write_sample_sheet()
+        assembly.fill_target_list()
+        assembly.add_module_targets()
+        assembly.add_output_dir()
+        assembly.write_module_config()
+        assembly.files_to_wd()
+        try:
+            assembly.run_module(job_count=num_jobs)
+        except Exception as e:
+            assembly.clear_working_directory()
+            raise e
+        assembly.check_module_output()
+        assembly.compute_processing_ids()
+        assembly.fill_output_file_maps()
+        assembly.annotate_processed_files()
+        assembly.switch_sample_ids()
+        assembly.write_sample_sheet()
         assembly.clear_working_directory()
-        raise e
-    assembly.check_module_output()
-    assembly.compute_processing_ids()
-    assembly.fill_output_file_maps()
-    assembly.annotate_processed_files()
-    assembly.switch_sample_ids()
-    assembly.write_sample_sheet()
-    assembly.clear_working_directory()
-    assembly.convert_fastq_names(to_illumina=False)
+        assembly.convert_fastq_names(to_illumina=False)
+    else:
+        sys.exit(f'Path to a folder containing fastq files (-i argument) must be supplied to run assembly module.')
     
     #Housekeeping
     hk.asign_perm_rec(path_to_folder=assembly.output_path)
@@ -383,5 +508,27 @@ def run_assembly(args, num_jobs):
         hk.remove_old_files(f"{pipeline_path}/covipipe_job_logs/")
 
 
-def run_downstream(args, num_jobs):
+def run_downstream(args):
     '''Wrapper function to run only downstream module.'''
+    downstream = Covid_downstream(
+        start_date=args.start_date,
+        end_date=args.end_date,
+        skip_pango = args.skip_pango,
+        skip_heatmap = args.skip_heatmap,
+        skip_db_update = args.skip_db_update,
+        skip_tessy = args.skip_tessy
+    )
+
+    if (downstream.start_date and downstream.end_date):
+    #Running downstream
+        downstream.generate_pipeline_report()
+        downstream.filter_pipeline_report()
+        downstream.generate_mutstat_report()
+        downstream.update_summary_file()
+        downstream.copy_mutation_files()
+        downstream.update_mut_heatmap()
+        downstream.generate_weekly_report()
+        downstream.generate_tessy_report()
+    else:
+        sys.exit(f'Skipping downstream as start-end dates (-d1; -d2) arguments were not supplied')
+    

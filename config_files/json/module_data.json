@@ -32,53 +32,5 @@
             "check":null,
             "taxonomy":null
         }
-    },
-    "downstream" : {
-        "targets":[
-            "_lineage_report.csv",
-            "_mutation_report.csv",
-            "_mutation_statistics.csv",
-            "_multiqc_report.html",
-            "_sekv_pārskats.docx",
-            "_sekv_pārskats_dati.csv",
-            "_izplatības_statistika.html",
-            "_mutāciju_apkopojums.html"
-        ],
-        "patterns":{
-            "inputs":[
-                "_qualimap/qualimapReport.html",
-                "_1_screen.txt",
-                "_2_screen.txt",
-                "_1_screen.html",
-                "_2_screen.html",
-                "_consensus.fasta",
-                "_cutadapt_log.txt",
-                "_fastp_report.html",
-                "_fastp.json",
-                "_ivar_log.txt",
-                "_mapped_report.txt",
-                "_seq_depth.txt",
-                ".ann.csv"
-        ],
-            "sample_sheet":"_R[1,2]_001.fastq.gz"
-        },
-        "job_name":"cov_downstream",
-        "requests":{
-            "check":[
-                "_qualimap/qualimapReport.html:True",
-                "_1_screen.txt",
-                "_2_screen.txt",
-                "_1_screen.html",
-                "_2_screen.html",
-                "_consensus.fasta:True",
-                "_cutadapt_log.txt:True",
-                "_fastp_report.html:True",
-                "_fastp.json:True",
-                "_ivar_log.txt:True",
-                "_mapped_report.txt:True",
-                "_seq_depth.txt:True",
-                ".ann.csv:True"
-        ], "taxonomy":null
-        }
     }
 }

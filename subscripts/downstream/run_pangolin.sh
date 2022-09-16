@@ -1,4 +1,11 @@
 #!/bin/bash
+#PBS -N run_pangolin
+#PBS -l walltime=00:40:00
+#PBS -l procs=20
+#PBS -l pmem=2g
+#PBS -q batch
+#PBS -j oe
+#PBS -A rakus
 
 #THE SCRIPT IS USED TO RUN PANGOLIN FROM SINGULARITY CONTAINER WITH DOWNSTREAM/MUTATION_REPORT.PY SCRIPT
 ctrl_arg1=${1:-1} #IF NO PARAMETER VALUE PROVIDED, SET 1ST PARAMETER VALUE TO 1 (PERFORM PANGOLIN TYPING)
@@ -8,16 +15,11 @@ module load singularity
 now=$(date +"%m_%d_%Y")
 if [ "$ctrl_arg2" == "~/" ]
 then
-    cd ../reports/report_${now}
+    cd /mnt/home/groups/nmrl/cov_analysis/reports/report_${now}
 else
     cd ${ctrl_arg2}
 fi
 
-if [ $ctrl_arg1 -eq 1 ] #IF THE FIRST PASSED PARAMETER IS EQUAL TO 1, PERFORM PANGOLIN TYPING
-then
-    awk '{print}' *.fasta > ${now}_combined.fasta
-    singularity run $pango_sif_path pangolin ${now}_combined.fasta --outfile ${now}_lineage_report.csv # RUNNING PANGOLIN AND PROVIDING TIME-DEPENDENT OUTPUT FILE NAMING
-elif [ $ctrl_arg1 -eq 0 ] #IF THE FIRST PASSED PARAMETER IS EQUAL TO 0, SKIP PANGOLIN TYPING & REPORT TO THE TERMINAL THAT PANGOLIN TYPING IS SKIPPED
-then
-    echo "Pangolin typing skipped."
-fi
+awk '{print}' *.fasta > ${now}_combined.fasta
+singularity run $pango_sif_path pangolin ${now}_combined.fasta -t 20 --outfile ${now}_lineage_report.csv # RUNNING PANGOLIN AND PROVIDING TIME-DEPENDENT OUTPUT FILE NAMING
+

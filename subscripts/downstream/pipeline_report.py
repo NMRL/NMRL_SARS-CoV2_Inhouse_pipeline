@@ -1,10 +1,9 @@
+#!/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/rbase_env/bin/python
 ##########
 #IMPORTS
 ##########
 
-from audioop import add
 import sys, os, pandas as pd, re, time, concurrent.futures, subprocess, argparse, shutil, pathlib, filecmp, numpy as np, warnings
-from unittest import result
 from datetime import datetime
 
 
@@ -12,7 +11,7 @@ from datetime import datetime
 #PATHS & SETUPS
 #################
 
-#Suppressing pandas warnings
+#SUPPRESSING PANDAS WARNINGS
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=UserWarning)
 
@@ -21,8 +20,9 @@ subprocess_path = f'/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/subscr
 covid_output_path = "/mnt/home/groups/nmrl/cov_analysis/covid_output/"
 report_folder_path = f'/mnt/home/groups/nmrl/cov_analysis/reports'
 raw_folder_path = f'/mnt/home/groups/nmrl/cov_analysis/raw'
-filter_path = f'/mnt/home/groups/nmrl/cov_analysis/fastq_processing/resources/report_filters.txt'
+filter_path = f'/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/downstream/report_filters.txt'
 default_metadata_path = "/mnt/home/groups/nmrl/cov_analysis/metadata/spkc_latest_3_month.csv"
+log_folder_path = "/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/covipipe_job_logs/"
 
 #TIMESTAMPS & STATIC STRINGS
 pipeline_string = 'bwa 0.7.17-r1198-dirty mem'
@@ -35,10 +35,9 @@ p_value = 0.05 #SET MAX ACCEPTABLE P VALUE TO CONFIRM THAT MUTATION IS DETECTED 
 
 #CONTROLLERS
 skip_excel_mining = False
-run_pangolin = False
 skip_sequence_stats = False
 rename_fasta_header = True
-use_p_filter = False
+use_p_filter = False #DEPRICATED
 use_f_filter = True
 
 #FILE FORMAT STRINGS TO LOOK FOR IN PIPELINE OUTPUT FILES
@@ -81,7 +80,7 @@ def validate_arguments(args:argparse.Namespace):
     Given a namespace object containing values of parsed arguments, returns a dictionary of validated values.
     If validation fails, prints the error-indicating message to stdout and returns None.
     '''
-    validated_arguments = {}
+    validated_arguments = {'skip_pango':args.skip_pango}
     if (args.start_date == None or args.end_date == None) and args.name_list == None: 
         #IF NO DATE AND NO SAMPLE ID LIST PROVIDED
         print(
@@ -165,7 +164,6 @@ def find_report_files(arguments:dict, walk_path:str, context_path_map:dict, pid_
                                     context_path_map[context].append(os.path.join(root,dir,file))
             break
     else:
-
         id_list = list(pd.read_csv(arguments["id_list_path"], header=None).iloc[:,0]) #CONVERT COLUMN OF IDS TO LIST
         for (root,dirs,_) in os.walk(covid_output_path, topdown=True): #FINDING PATH TO EACH FILE THAT MATCHES TIME CRITERIA
             for dir in sorted(dirs)[::-1]: 
@@ -191,14 +189,14 @@ def copy_files(file_path:str, source_files_path:str):
         shutil.copy(file_path, f'{source_files_path}/')
 
 
-def copy_files_parallel(path_list:list, source_files_path:str, procs:int=6):
+def copy_files_parallel(path_list:list, source_files_path:str, procs:int=6, progress_bar:bool=True):
     '''Function to copy files using multiprocessing'''
     with concurrent.futures.ProcessPoolExecutor(max_workers=procs) as executor:
         results = [executor.submit(copy_files, file_path, source_files_path) for file_path in path_list]
         processed_count = 0 #TO VIEW PROGRESS
         for _ in concurrent.futures.as_completed(results):
             processed_count += 1 #counting processed files
-            printProgressBar(processed_count, len(path_list), prefix = 'Progress:', suffix = 'Complete', length = 50)
+            if progress_bar: printProgressBar(processed_count, len(path_list), prefix = 'Progress:', suffix = 'Complete', length = 50)
 
 
 def validate_context_file_paths(context_map:dict):
@@ -565,7 +563,7 @@ def add_tree_info(result_df:pd.DataFrame, nmrl_samples:pd.DataFrame, eurofins_sa
     return result_df
 
 
-def mutation_report_generator(output_path:str, f_value:float, all_excel_dump_df:pd.DataFrame=None, sequence_stats_df:pd.DataFrame=None, pango_report_path:str=None):
+def mutation_report_generator(output_path:str, f_value:float):
     """
     Generate mutation report using helper functions to extract and process metadata and pipeline results.
     """
@@ -582,9 +580,9 @@ def mutation_report_generator(output_path:str, f_value:float, all_excel_dump_df:
     tree_data = parse_directory_tree(result_df, report_path, raw_folder_path)
     result_df, eurofins_samples, nmrl_samples = tree_data[0], tree_data[1], tree_data[2]
 
-#ADDING EXTRACTED INFO TO THE RESULTS ADN GENERATING REPORT
+#ADDING EXTRACTED INFO TO THE RESULTS AND GENERATING REPORT
     result_df = add_tree_info(result_df, nmrl_samples, eurofins_samples)
-    result_df.to_csv(f'{output_path}/{"{0:%Y-%m-%d-%H-%M}".format(datetime.now())}_ft_{f_value}_mutation_report.csv', header=True, index=False, encoding='utf-8-sig') #GENERATING THE REPORT
+    result_df.to_csv(f'{output_path}/pipeline_report.csv', header=True, index=False, encoding='utf-8-sig') #GENERATING THE REPORT
 
 
 
@@ -595,56 +593,34 @@ def mutation_report_generator(output_path:str, f_value:float, all_excel_dump_df:
 
 if __name__ == "__main__":
     
-#######################
 #ARGUMENT DECLARATION
-#######################
-
     parser = argparse.ArgumentParser(description='A script to generate a mutation report given range of dates or list of sample ids.') #ARGPARSER OBJECT TO PROVIDE COMMAND-LINE FUNCTIONALITY
     parser.add_argument('-d1', '--start_date', metavar='\b', help = 'A starting sequencing date of the reference interval (YYYY-MM-DD).', default=None, required=False)
     parser.add_argument('-d2', '--end_date', metavar='\b', help = 'An ending sequencing date of the reference interval (YYYY-MM-DD).', default=None, required=False)
     parser.add_argument('-l', '--name_list', metavar='\b', help = 'Path to list of file names to lookup in folders', default=None, required=False)
     parser.add_argument('-o', '--output_dir', metavar='\b', help = 'Path to the folder where report folder should be created', default=report_folder_path, required=False)
     parser.add_argument('-m', '--metadata', metavar='\b', help = 'Path to the metadata table', default=default_metadata_path, required=False)
+    parser.add_argument('-s', '--skip_pango', help = "Flag to skip pangolin typing.", action='store_true')
 
-
-#########################
 #ARGUMENT PRE-ROCESSING
-#########################
-
-    #PARSING ARGUMENTS
     args = parse_arguments(parser)
-
-    #VALIDATING ARGUMENTS
     valid_args = validate_arguments(args)
-
-    #VALIDATING DATES IF SUPPLIED
     if valid_args["date_1"]: validate_dates(valid_args)
 
 
-#########################################
 #SEARCHING FOR RELEVANT FILES & FOLDERS
-#########################################
-
     if valid_args["date_1"]: find_report_files(valid_args, covid_output_path, context_path_map=context_path_map) #SEARCHING BY DATE RANGE
     else: find_report_files(valid_args, covid_output_path, context_path_map=context_path_map, by_date=False) #SEARCHING BY SAMPLE ID
 
 
-##################################
 #VERIFYING PROCESSING COMPLETION
-##################################
-
-    #CHECKING THAT ALL FILE FORMATS REFER TO THE SAME NUMBER OF FILES
     file_count_check = validate_context_file_paths(context_path_map)
-    if file_count_check: #PRINT THE FILE FORMATS THAT FAILED AND CORRESPONDING FILE COUNT
+    if file_count_check: #PRINT THE FILE FORMATS THAT FAILED WITH CORRESPONDING FILE COUNT
         [print(context, file_count_check[context]) for context in file_count_check]
         sys.exit('\nERROR: Some samples lack input files!\nPlease reprocess the samples or modify the query so that all required files exist.')
 
 
-###########################################
 #CREATING REPORT FOLDER AND COPYING FILES
-###########################################
-
-    #CREATE REPORT FOLDERS IF THEY DO NOT EXIST
     if valid_args['id_list_path'] is not None: #CREATE NEW REPORT_FOLDER
         source_files_path = f'{report_folder_path}/report_{datetime.now().date().strftime("%Y-%m-%d")}_{valid_args["id_list_path"]}/source_files' #PATH TO FOLDER WHERE SOURCE FILES SHOULD BE SAVED
         report_path = str(pathlib.Path(source_files_path).parents[0]) #PATH TO FOLDER WHERE REPORTS SHOULD BE SAVED
@@ -676,20 +652,29 @@ if __name__ == "__main__":
     else: all_excel_dump_df = None
 
 # RUNNING PANGOLIN IF ALLOWED BY CONTROLLERS
-    if run_pangolin: # PROVIDING CORRECT PATH FOR RUN_PANGOLIN.SH & USING SUBPROCESS TO RUN IT WITH OPTIONS FROM CONTROL VARIABLE
-        os.chdir(subprocess_path), subprocess.check_call(["./run_pangolin.sh", str(1), source_files_path]) 
-    elif not run_pangolin: # IF PANGOLIN TYPING OPTION SKIPPED - CHECK IF PANGOLIN UDPATE IS REQUIRED
-        os.chdir(subprocess_path), subprocess.check_call(["./run_pangolin.sh", str(0), source_files_path]) 
-    # PATHS TO PANGOLIN OUTPUT
-    combined_path = [path for path in os.listdir(source_files_path) if 'combined.fasta' in path][0]
-    combined_fasta_path = f'{source_files_path}/{combined_path}'
-    pango_report_path = f'{source_files_path}/{timestr_fasta}_lineage_report.csv'
+    if not valid_args['skip_pango']: # PROVIDING CORRECT PATH FOR RUN_PANGOLIN.SH & USING SUBPROCESS TO RUN IT WITH OPTIONS FROM CONTROL VARIABLE
+        #RUNNING THE COMMAND
+        log_path = f'{log_folder_path}{datetime.now().strftime("%Y-%m-%d-%H-%M")}_pangolin.log'
+        command = ['qsub', "-o", log_path, "-e", log_path, "-F", f"{1} {source_files_path}", f"{subprocess_path}run_pangolin.sh"]
+        subprocess.check_call(command)
+        #WAITING FOR JOB TO COMPLETE
+        while not os.path.isfile(f'{source_files_path}/{timestr_fasta}_lineage_report.csv'): time.sleep(30)
+        #PATHS TO REPORTS
+        pango_report_path = f'{source_files_path}/{timestr_fasta}_lineage_report.csv'
+        combined_path = [path for path in os.listdir(source_files_path) if 'combined.fasta' in path][0]
+        combined_fasta_path = f'{source_files_path}/{combined_path}'
+    elif valid_args['skip_pango']:
+        print(f'Pangolin typing skipped.')
+        pango_report_path = f'{report_path}/{timestr_fasta}_lineage_report.csv'
+        combined_path = [path for path in os.listdir(source_files_path) if 'combined.fasta' in path][0]
+        combined_fasta_path = f'{source_files_path}/{combined_path}'
+
 
 
 #GENERATING MUTATION REPORT
     if not skip_sequence_stats: sequence_stats_df = get_nt_counting_stats(combined_fasta_path, skip_sequence_stats, rename_fasta_header) 
-    mutation_report_generator(source_files_path, f_value, all_excel_dump_df, sequence_stats_df, pango_report_path)
+    mutation_report_generator(source_files_path, f_value)
 
 #PERFORMING CLEANUP
-    os.system(f'mv {source_files_path}/{"{0:%Y-%m-%d-%H-%M}".format(datetime.now())}_ft_{f_value}_mutation_report.csv {report_path}')
-    os.system(f'mv {source_files_path}/{timestr_fasta}_lineage_report.csv {report_path}')
+    os.system(f'mv {source_files_path}/pipeline_report.csv {report_path}')
+    if not valid_args['skip_pango']: os.system(f'mv {source_files_path}/{timestr_fasta}_lineage_report.csv {report_path}')
