@@ -5,7 +5,7 @@ summary_data_path = sys.argv[2] #PATH TO SUMMARY STATISTICS FILE
 summary_data = pd.read_csv(summary_data_path) #READ METADATA FROM SUMMARY FILE
 summary_data = summary_data[['receiving_lab_sample_id','sampling_date']] #SELECT RELEVANT COLUMNS
 summary_data = summary_data[summary_data['sampling_date'].str.match(r'[0-9]{4}-[0-9]{2}-[0-9]{2}')==True] #FILTER INVALID VALUES BASED ON REGEX FOR DATE FORMAT
-output_folder = '/mnt/home/groups/nmrl/cov_analysis/mutation_heatmap/mut_heatmap_data'
+output_folder = '/mnt/home/groups/nmrl/cov_analysis/mutation_heatmap/mut_heatmap_data/'
 
 def process_mutations(file_path):
     df = pd.read_csv(file_path) #READ EACH REPORT
