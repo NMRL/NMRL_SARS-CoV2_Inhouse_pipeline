@@ -1,4 +1,5 @@
 import re, os, pandas as pd, concurrent.futures, subprocess, sys
+from turtle import down
 from datetime import datetime
 from subscripts.covipipe_utilities import covipipe_housekeeper as hk
 from subscripts.downstream.pipeline_report import copy_files_parallel
@@ -158,7 +159,7 @@ class Covid_assembly(Module):
             for id in self.processing_id_dict:
                 if id in file_path:
                     new_path = re.sub(id, self.processing_id_dict[id], file_path) #adding numbered id
-                    new_path = re.sub(r"_S[0-9]*\/", "", new_path) #removing illumina run sample number
+                    new_path = re.sub(r"(_S[0-9]{3}|_S[0-9]{2}|_S[0-9]{1})", "", new_path) #removing illumina run sample number
                     if 'qualimap' in file_path: #sample id in directory name and directory should be named
                         old_path = os.path.dirname(file_path)
                         new_path = os.path.dirname(new_path)
@@ -208,17 +209,17 @@ class Covid_assembly(Module):
         If new_to_old is set to True, performs the reverse operation.
         '''
         if new_to_old:
-            temp_dict = {re.sub(r"(_S[0-9]{1}|_S[0-9]{2}|_S[0-9]{3})", "", self.processing_id_dict[id]):id for id in self.processing_id_dict} #removing run ids
+            temp_dict = {re.sub(r"(_S[0-9]{3}|_S[0-9]{2}|_S[0-9]{1})", "", self.processing_id_dict[id]):id for id in self.processing_id_dict} #removing run ids
             self.sample_sheet = hk.map_replace_column(self.sample_sheet, temp_dict, 'sample_id', 'sample_id')
         else:
-            temp_dict = {id:re.sub(r"(_S[0-9]{1}|_S[0-9]{2}|_S[0-9]{3})", "", self.processing_id_dict[id]) for id in self.processing_id_dict} #removing run ids
+            temp_dict = {id:re.sub(r"(_S[0-9]{3}|_S[0-9]{2}|_S[0-9]{1})", "", self.processing_id_dict[id]) for id in self.processing_id_dict} #removing run ids
             self.sample_sheet = hk.map_replace_column(self.sample_sheet, temp_dict, 'sample_id', 'sample_id')
 
 
 class Covid_downstream():
     '''Class implements pipeline-specific downstream processing methods'''
 
-    def __init__(self, start_date:str, end_date:str, skip_pango:bool, skip_heatmap:bool, skip_db_update:bool, skip_tessy:bool):
+    def __init__(self, start_date:str, end_date:str, skip_pango:bool, skip_heatmap:bool, skip_db_update:bool, skip_tessy:bool, update_share:bool):
 
         #command-line arguments
         self.start_date = start_date
@@ -227,6 +228,7 @@ class Covid_downstream():
         self.skip_heatmap = skip_heatmap
         self.skip_db_update = skip_db_update
         self.skip_tessy = skip_tessy
+        self.update_share = update_share
 
         #static paths
         self.report_folder_path = "/mnt/home/groups/nmrl/cov_analysis/reports/"
@@ -237,8 +239,10 @@ class Covid_downstream():
         self.heatmap_update_script = "/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/subscripts/downstream/update_heatmap_job.sh"
         self.weekly_report_script = "/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/subscripts/downstream/run_papermill.sh"
         self.summary_file_script = "/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/subscripts/downstream/update_database_file.py"
+        self.update_share_script = "/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/subscripts/downstream/copy_to_c19_share.sh"
         self.log_folder_path = "/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/covipipe_job_logs/"
         self.papermill_path = "/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/rbase_env/bin/papermill"
+        self.share_update_file_path = "/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/downstream/c19_share_update.txt"
 
         #operational variables
         self.current_summary_file = None
@@ -375,7 +379,27 @@ class Covid_downstream():
             except subprocess.CalledProcessError:
                 sys.exit(f'TESSY report generation failed\nSee {log_path} for details')
         else:
-             sys.exit(f'TESSY report generation skipped.')
+            print(f'TESSY report generation skipped.')
+
+
+    def update_covidshare(self):
+        '''
+        Updates covidshare by copying bam, fasta and vcf files for all samples included in self.filtered_report_path file.
+        '''
+        if self.update_share:
+            log_path = f'{self.log_folder_path}{datetime.now().strftime("%Y-%m-%d-%H-%M")}_update_share.log'
+            os.system(f'''
+            echo "Preparing list of samples."
+            cat {self.filtered_report_path} | while IFS="," read a b c; do echo ${{b}}_${{a}} ; done > {self.share_update_file_path} 2>> {log_path}
+            ''')
+            print('Submitting job to HPC to update c19_data_share contents.')
+            command = ['qsub', "-o", log_path, "-e", log_path, self.update_share_script]
+            try:
+                with open(log_path, 'w+') as log_file:
+                    log_file.write(" ".join(command))
+                    subprocess.check_call(command, stdout=log_file, stderr=log_file)
+            except subprocess.CalledProcessError:
+                sys.exit(f'Covidshare update failed\nSee {log_path} for details')
 
 
 ################################################
@@ -410,7 +434,8 @@ def run_all(args, num_jobs):
         skip_pango = args.skip_pango,
         skip_heatmap = args.skip_heatmap,
         skip_db_update = args.skip_db_update,
-        skip_tessy = args.skip_tessy
+        skip_tessy = args.skip_tessy,
+        update_share = args.update_share
     )
 
     if assembly.input_path:
@@ -447,6 +472,7 @@ def run_all(args, num_jobs):
         downstream.update_mut_heatmap()
         downstream.generate_weekly_report()
         downstream.generate_tessy_report()
+        downstream.update_covidshare()
     else:
         sys.exit(f'Skipping downstream as start-end dates (-d1; -d2) arguments were not supplied')
     
@@ -516,7 +542,8 @@ def run_downstream(args):
         skip_pango = args.skip_pango,
         skip_heatmap = args.skip_heatmap,
         skip_db_update = args.skip_db_update,
-        skip_tessy = args.skip_tessy
+        skip_tessy = args.skip_tessy,
+        update_share = args.update_share
     )
 
     if (downstream.start_date and downstream.end_date):
@@ -529,6 +556,7 @@ def run_downstream(args):
         downstream.update_mut_heatmap()
         downstream.generate_weekly_report()
         downstream.generate_tessy_report()
+        downstream.update_covidshare()
     else:
         sys.exit(f'Skipping downstream as start-end dates (-d1; -d2) arguments were not supplied')
     

@@ -50,8 +50,12 @@ cons_min_variant_supporting_read_fraction: 0.5 #50%
 cons_min_coverage: 15
 
 #abra (indel realignment)
-abra_jar_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/abra-0.97-SNAPSHOT-jar-with-dependencies_singularity.jar
-abra_memory_limit_gb: 8
+# abra_jar_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/abra-0.97-SNAPSHOT-jar-with-dependencies_singularity.jar
+abra_jar_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/abra2-2.23.jar
+abra_memory_limit_gb: 40
+abra_rule_cpus: 30
+dedup_threshold: 1000000 #minimum reads per sample to run deduplication
+picard_jar_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/picard.jar
 
 #qualimap (alignment QC)
 qualimap_sif_path: /mnt/home/groups/nmrl/image_files/qualimap_latest.sif
@@ -70,6 +74,9 @@ snpEff_reference: MN908947
 fq_screen_config: db/db-fastq-screen/fastq_screen.conf
 read1_downsample_fraction: 5 #what part of reads will be screened against fqscreen db (expected denominator of a fraction, e.g. if 20% (1/5) of the reads needed, 5 is expected)
 read2_downsample_fraction: 5
+
+#multiqc
+multiqc_threads: 12
 
 ###Filled by the wrapper
 assembly_target_files:

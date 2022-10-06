@@ -18,9 +18,9 @@ __default__:
 ##############
 all:
   jobname: "covipipe.aggregation"
-  procs: 12
-  pmem: "1500mb"
-  walltime: "00:30:00"
+  procs: 5
+  pmem: "3000mb"
+  walltime: "03:00:00"
   account: "rakus"
   queue: "batch"
   jobout: "oe"
@@ -68,9 +68,9 @@ primer_trimming:
 
 indel_realignment:
   jobname: "covipipe.indel_realignment"
-  procs: 14
-  pmem: "1500mb"
-  walltime: "00:30:00"
+  procs: 30
+  mem: "40000mb"
+  walltime: "05:00:00"
   account: "rakus"
   queue: "batch"
   jobout: "oe"

@@ -58,4 +58,8 @@ def vcf_to_csv(path_to_vcf,output_path=None):
     return f'{file}vcf - processed - {"{0:%Y-%m-%d %H:%M:%S}".format(datetime.datetime.now())}' #stdoutput upon completion
 
 path_to_vcf, output_path = sys.argv[1], sys.argv[2]
-print(vcf_to_csv(path_to_vcf, output_path)) #stdoutput
+try:
+    print(vcf_to_csv(path_to_vcf, output_path)) #stdoutput
+except TypeError:
+    print(f'WARNING: Empty vcf file -- {path_to_vcf}')
+    open(output_path, mode='a').close()

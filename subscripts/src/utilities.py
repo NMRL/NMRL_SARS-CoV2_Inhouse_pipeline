@@ -410,12 +410,16 @@ class Housekeeper:
         path_to_log_dir:str=f"{os.path.dirname(Path(__file__).parents[1].absolute())}/{pipeline_name}_job_logs"
         os.chdir(path_to_log_dir)
         log_list = [f for f in os.listdir("./") if f"_{pipeline_name}" not in f and "_default" not in f] #if pipeline name in log name is preceeded by _ it is already annotated
-        for log in log_list:
+        print(f'\nAdding sample ids to log file names.\n')
+        log_count = len(log_list)
+        for i,log in enumerate(log_list):
             try:
                 sample_id = Housekeeper.extract_log_id(log)
             except PermissionError:
                 continue
-            if sample_id and sample_id not in log: Housekeeper.rename_file(log, sample_id, path_to_log_dir) #if no sample id is found, the extract_log_id returns False
+            if sample_id and sample_id not in log: 
+                Housekeeper.rename_file(log, sample_id, path_to_log_dir) #if no sample id is found, the extract_log_id returns False
+            Housekeeper.printProgressBar(i+1, log_count, prefix = 'Progress:', suffix = 'Complete', length = 50)
 
 
     @staticmethod
@@ -428,11 +432,38 @@ class Housekeeper:
         os.chdir(path_to_folder)
         file_list = os.listdir(path_to_folder)
         today=datetime.now() #current time
-        for file in file_list:
+        print(f'\nRemoving log files older than {valid_days} days.\n')
+        file_count = len(file_list)
+        for i,file in enumerate(file_list):
             file_date = datetime.fromtimestamp(os.path.getctime(f"./{file}")) #getting creation time of a file
             dif_days=(today-file_date).days #checking how many days passed since the file was created
             if dif_days > valid_days: #if file is older - delete it
                 os.remove(f'./{file}')
+            Housekeeper.printProgressBar(i+1, file_count, prefix = 'Progress:', suffix = 'Complete', length = 50)
+
+
+    @staticmethod
+    def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
+        """
+        from https://stackoverflow.com/questions/3173320/text-progress-bar-in-terminal-with-block-characters
+        Call in a loop to create terminal progress bar
+        @params:
+            iteration   - Required  : current iteration (Int)
+            total       - Required  : total iterations (Int)
+            prefix      - Optional  : prefix string (Str)
+            suffix      - Optional  : suffix string (Str)
+            decimals    - Optional  : positive number of decimals in percent complete (Int)
+            length      - Optional  : character length of bar (Int)
+            fill        - Optional  : bar fill character (Str)
+            printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
+        """
+        percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+        filledLength = int(length * iteration // total)
+        bar = fill * filledLength + '-' * (length - filledLength)
+        print(f'\r{prefix} |{bar}| {percent}% {suffix}', end = printEnd)
+        # Print New Line on Complete
+        if iteration == total: 
+            print()
 
 
 class Query_ncbi:

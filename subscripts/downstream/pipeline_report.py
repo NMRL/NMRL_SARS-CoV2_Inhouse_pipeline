@@ -37,7 +37,7 @@ p_value = 0.05 #SET MAX ACCEPTABLE P VALUE TO CONFIRM THAT MUTATION IS DETECTED 
 skip_excel_mining = False
 skip_sequence_stats = False
 rename_fasta_header = True
-use_p_filter = False #DEPRICATED
+use_p_filter = False
 use_f_filter = True
 
 #FILE FORMAT STRINGS TO LOOK FOR IN PIPELINE OUTPUT FILES
@@ -264,8 +264,12 @@ def get_nt_counting_stats(combined_fasta_path:str, skip:bool=False, headers_chan
         genome_dict_items = readGenome(combined_fasta_path).items() #GET HEADER:SEQUENCE PAIRS FROM READGENOME() OUTPUT
         for header, sequence in genome_dict_items: #LOOPING THROUGH EACH HEADER-SEQUENCE PAIR IN GENOME DICT
             sequence_length = len(sequence) #CALCULATING GENOME LENGTH
-            gc_content = round(100 * (sequence.count('G') + sequence.count('C')) / len(sequence), 2) #CALCULATING GC-CONTENT FOR EACH SEQUENCE
-            n_content = round(100 * (sequence.count('N') / len(sequence)), 2) #CALCULATING INVALID BASE CONTENT FOR EACH SEQUENCE
+            if sequence_length > 0: 
+                gc_content = round(100 * (sequence.count('G') + sequence.count('C')) / len(sequence), 2) #CALCULATING GC-CONTENT FOR EACH SEQUENCE
+                n_content = round(100 * (sequence.count('N') / len(sequence)), 2)
+            else: 
+                gc_content = 0
+                n_content = 0
             if re.search(r'[A-Z]{2}[0-9]{4}\.B([0-9]{2}|[0-9])', header): new_header = re.search(r'[A-Z]{2}[0-9]{4}\.B([0-9]{2}|[0-9])', header).group(0)
             elif headers_changed: new_header = header.split("/")[2] #EXTRACTING SAMPLE ID FROM FASTA HEADER TO BE USED LATER IN THE COLUMN MAPPING PROCESS
             else: new_header = header.split("_")[1].strip() #EXTRACTING SAMPLE ID FROM FASTA HEADER TO BE USED LATER IN THE COLUMN MAPPING PROCESS IF FASTA HEADERS WERE NOT CHANGED
@@ -279,27 +283,28 @@ def csv_info_extractor(file_path:str, filter_list:list, f_value:float):
     Parses a csv file, exctract mutation information
     based on set of provided filters.
     """
-
+    sample_id = file_path.split('/')[-1].split("_", 1)[1]
+    sample_id = sample_id[:len(sample_id) - 8]
+    processing_id = file_path.split('/')[-1][:9]
+    result_row = {"SAMPLE_ID": sample_id, "processing_id": processing_id}
     try:
-        sample_id = file_path.split('/')[-1].split("_", 1)[1]
-        sample_id = sample_id[:len(sample_id) - 8]
-        processing_id = file_path.split('/')[-1][:9]
         df = pd.read_csv(file_path)
-        result_row = {"SAMPLE_ID": sample_id, "processing_id": processing_id}
+        for key in filter_list.keys(): 
+            if use_f_filter:
+                mut_df = df.loc[
+                    (df["AMINO_ACID_CHANGE"].isin(filter_list[key])) & (df["FREQUENCY"] >= f_value)
+                ]
+            elif use_p_filter:
+                mut_df = df.loc[
+                    (df["AMINO_ACID_CHANGE"].isin(filter_list[key])) & (df["P_ERR_MUT_CALL"] < p_value)
+                ]
+            if len(mut_df["P_ERR_MUT_CALL"]) == len(filter_list[key]): #IF THE NUMBER OF EXTRACTED (UNIQUE) ROWS MATCHES THE NUMBER OF MUTATION_NAMES FOR A GIVEN FILTER_NAME
+                result_row[key] = str(1) #ASSUME THAT THE MUTATION SPECIFIED BY THE FILTER WAS FOUND - ADD FILTER_NAME:1 PAIR TO THE RESULT_ROW DICT
+            else: result_row[key] = str(round(len(mut_df["P_ERR_MUT_CALL"])/len(filter_list[key]), 2)) #IF THE NUMBER OF EXTRACTED (UNIQUE) ROWS DOES NOT MATCH THE NUMBER OF MUTATION_NAMES FOR A GIVEN FILTER_NAME - ADD FILTER_NAME:%MATCH PAIR TO THE RESULT_ROW DICT
     except:
-        sys.exit(f'ERROR: failed to parse {file_path}')
-    for key in filter_list.keys(): 
-        if use_f_filter:
-            mut_df = df.loc[
-                (df["AMINO_ACID_CHANGE"].isin(filter_list[key])) & (df["FREQUENCY"] >= f_value)
-            ]
-        elif use_p_filter:
-            mut_df = df.loc[
-                (df["AMINO_ACID_CHANGE"].isin(filter_list[key])) & (df["P_ERR_MUT_CALL"] < p_value)
-            ]
-        if len(mut_df["P_ERR_MUT_CALL"]) == len(filter_list[key]): #IF THE NUMBER OF EXTRACTED (UNIQUE) ROWS MATCHES THE NUMBER OF MUTATION_NAMES FOR A GIVEN FILTER_NAME
-            result_row[key] = str(1) #ASSUME THAT THE MUTATION SPECIFIED BY THE FILTER WAS FOUND - ADD FILTER_NAME:1 PAIR TO THE RESULT_ROW DICT
-        else: result_row[key] = str(round(len(mut_df["P_ERR_MUT_CALL"])/len(filter_list[key]), 2)) #IF THE NUMBER OF EXTRACTED (UNIQUE) ROWS DOES NOT MATCH THE NUMBER OF MUTATION_NAMES FOR A GIVEN FILTER_NAME - ADD FILTER_NAME:%MATCH PAIR TO THE RESULT_ROW DICT
+        print(f'WARNING: failed to parse {file_path}')
+        for key in filter_list.keys():
+            result_row[key] = str(0)
     return result_row
 
 
@@ -309,15 +314,27 @@ def depth_info_extractor(file_path):
     sequencing_date and sequencing lab for each sample.
     Returns result dictionary where sample is identified by SAMPLE_ID column.
     '''
-
-    data = pd.read_csv(file_path, delimiter='\t').iloc[:,2]
+    #ID EXTRACTION
     path_split = file_path.split('/')
     sample_id = path_split[-1].split("_", 1)[1]
     sample_id = sample_id[:len(sample_id) - 14]
     seq_date = path_split[-2].split("-")[1].replace("_","-")
     seq_lab = path_split[-2].split("-")[0].replace("_","(")+")"
     processing_id = file_path.split('/')[-1][:9]
-    result_row = {'SAMPLE_ID':sample_id, "seq_date":seq_date, 'seq_institution':seq_lab, "processing_id":processing_id, 'AVERAGE_COVERAGE':sum(data)/len(data), 'MEDIAN_COVERAGE':data.median()}
+    
+    #BY-DEFAULT ASSUMING THAT COVERAGE FILE IS EMPTY (NO READS MAPPED - COVERAGE 0)
+    result_row = {
+        'SAMPLE_ID':sample_id, 
+        "seq_date":seq_date, 
+        'seq_institution':seq_lab, 
+        "processing_id":processing_id, 
+        'AVERAGE_COVERAGE':0, 
+        'MEDIAN_COVERAGE':0
+    }
+
+    if not os.stat(file_path).st_size == 0:
+        data = pd.read_csv(file_path, delimiter='\t').iloc[:,2]
+        result_row['AVERAGE_COVERAGE'], result_row['MEDIAN_COVERAGE'] = sum(data)/len(data), data.median()
     return result_row
     
 
@@ -383,7 +400,6 @@ def run_extractors_parallel(context_map:dict, filter_list:dict, f_value:float):
     column_reorder_list = ['SAMPLE_ID', 'processing_id'] + list(filter_list.keys()) + ['AVERAGE_COVERAGE', 'MAPPED_FRACTION', 'READS_MAPPED', 'TOTAL_READS', 'MEDIAN_COVERAGE', 'seq_date', 'seq_institution']
     result_df = result_df[column_reorder_list] #REORDERING COLUMNS BASED IN ORDER OF FILTERS IN REPORT_FILTERS.TXT FILE
     result_df.rename(columns={'SAMPLE_ID':"receiving_lab_sample_id"}, inplace=True) #FOR MERGING PURPOSES
-
     return result_df
 
 
@@ -439,7 +455,6 @@ def add_static_values(df:pd.DataFrame,
     #SPECIAL CASE
     df.loc[df.processing_id == 'Z_BMC', 'sequencing_platform'] = 'MGI'
     df.loc[df.processing_id == 'Z_BMC', 'analysis_institution'] = 'BMC'
-
     return df
 
 
@@ -449,7 +464,7 @@ def parse_directory_tree(df:pd.DataFrame, report_path:str, raw_folder_path:str):
     Adds metadata to the df based on receiving_lab_sample_id. Returns tuple of 3 pandas dataframes in order:
     df - input dataframe annotated with analysis_date & analysis batch; nmrl_samples - dataframe where each analysed
     sample that was sequenced in NMRL is mapped to its fastq file path (one for each sample); eurofins_samples - 
-    same as nmrl_samples but for samples sequenced in eurofins. 
+    same as nmrl_samples but for samples sequenced by eurofins. 
     '''
 
     # ANALYSIS_DATE & ANALYSIS_BATCH_ID
@@ -464,10 +479,11 @@ def parse_directory_tree(df:pd.DataFrame, report_path:str, raw_folder_path:str):
     sample_ids.to_csv(f'{report_path}/sample_ids.csv',header=False,index=False)
 
     #FINDNG FULL PATHS TO FASTQ FILES USING BASH
-    os.system(f'ls -R {raw_folder_path} | grep 1.fastq.gz > {report_path}/fastq_files.csv')
-    os.system(f'cat {report_path}/sample_ids.csv | while IFS="," read a ; do cat {report_path}/fastq_files.csv | grep "$a" ; done > {report_path}/sample_file_list.csv')
-    os.system(f'cat {report_path}/sample_file_list.csv | xargs -n1 -P12 -I% find {raw_folder_path}/ -type f -name % > {report_path}/path_list.csv')
-    os.system(f'rm {report_path}/sample_file_list.csv {report_path}/fastq_files.csv {report_path}/sample_ids.csv')
+    if not os.path.isfile(f'{report_path}/path_list.csv') or os.stat(f'{report_path}/path_list.csv').st_size == 0:
+        os.system(f'ls -R {raw_folder_path} | grep 1.fastq.gz > {report_path}/fastq_files.csv')
+        os.system(f'cat {report_path}/sample_ids.csv | while IFS="," read a ; do cat {report_path}/fastq_files.csv | grep "$a" ; done > {report_path}/sample_file_list.csv')
+        os.system(f'cat {report_path}/sample_file_list.csv | xargs -n1 -P12 -I% find {raw_folder_path}/ -type f -name % > {report_path}/path_list.csv')
+        os.system(f'rm {report_path}/sample_file_list.csv {report_path}/fastq_files.csv {report_path}/sample_ids.csv')
     sample_paths = pd.read_csv(f'{report_path}/path_list.csv', header=None)
     sample_frame = pd.DataFrame({'id':[],'path':[]})
 
@@ -478,7 +494,7 @@ def parse_directory_tree(df:pd.DataFrame, report_path:str, raw_folder_path:str):
         paths["id"] = [id for _ in range(len(paths.path))] #ADD ID
         paths.drop('index', inplace=True, axis=1) #REMOVE INDEX COLUMN
         sample_frame = sample_frame.append(paths) #COMBINE IN ONE DF
-    os.system(f'rm {report_path}/path_list.csv')
+    # os.system(f'rm {report_path}/path_list.csv')
 
     #GETTING RUN FOLDER NAMES FROM FULL PATHS
     sample_frame[['raw','run_folder','fastq']] = sample_frame['path'].str.rsplit('/', n=2, expand=True) #GENERATE NEEDED COLUMNS
@@ -486,7 +502,7 @@ def parse_directory_tree(df:pd.DataFrame, report_path:str, raw_folder_path:str):
     sample_frame.drop('fastq', inplace=True, axis=1) #REMOVE USELESS COLUMN
     eurofins_samples = sample_frame[~sample_frame['run_folder'].str.contains('nmrl')]
     nmrl_samples = sample_frame[sample_frame['run_folder'].str.contains('nmrl')]
-
+    # sample_frame.to_csv('/mnt/home/jevgen01/nmrl/cov_analysis/SARS-CoV2_assembly/subscripts/downstream/sample_frame.csv', header=True, index=False)
     #SPLIT RUN FOLDER NAME TO COLUMNS AND DROP SAMPLE DUPLICATES
     if len(eurofins_samples) > 0:
         eurofins_samples[['seq_date','1','2','3','4']] = eurofins_samples['run_folder'].str.rsplit('-', n=4, expand=True)
@@ -494,7 +510,8 @@ def parse_directory_tree(df:pd.DataFrame, report_path:str, raw_folder_path:str):
         nmrl_samples[['seq_date','lab','kit','instrument', 'seq_mode', 'primer']] = nmrl_samples['run_folder'].str.rsplit('-', n=5, expand=True)
     eurofins_samples.drop_duplicates(subset='id', keep='first', inplace=True)
     nmrl_samples.drop_duplicates(subset='id', keep='first', inplace=True)
-
+    # nmrl_samples.to_csv('/mnt/home/jevgen01/nmrl/cov_analysis/SARS-CoV2_assembly/subscripts/downstream/nmrl_samples.csv', header=True, index=False)
+    
     return df, eurofins_samples, nmrl_samples
 
 
@@ -516,14 +533,16 @@ def add_tree_info(result_df:pd.DataFrame, nmrl_samples:pd.DataFrame, eurofins_sa
 
     #GET METADATA FOR THE SAMPLE
             if reported_samples['seq_institution'][0] == 'NMRL(LIC)':  #IF SEQUENCING INSTITUTION IS DETERMINED AS NMRL
-                    run_folder = nmrl_samples.loc[nmrl_samples.id == id]['run_folder'][0]
-                    batch_id = nmrl_samples.loc[nmrl_samples.id == id]['seq_date'][0]
-                    used_batch_ids = batch_id
-                    library_prep_method = nmrl_samples.loc[nmrl_samples.id == id]['kit'][0]
-                    analysis_pipeline_notes = nmrl_samples.loc[nmrl_samples.id == id]['primer'][0]
+                id_match = nmrl_samples.loc[nmrl_samples.id == id].reset_index(drop=True)
+                run_folder = id_match['run_folder'][0]
+                batch_id = id_match['seq_date'][0]
+                used_batch_ids = batch_id
+                library_prep_method = id_match['kit'][0]
+                analysis_pipeline_notes = id_match['primer'][0]
             else:  #IF NOT NMRL
-                run_folder = eurofins_samples.loc[eurofins_samples.id == id]['run_folder'][0]
-                batch_id = eurofins_samples.loc[eurofins_samples.id == id]['seq_date'][0]
+                id_match = eurofins_samples.loc[eurofins_samples.id == id].reset_index(drop=True)
+                run_folder = id_match['run_folder'][0]
+                batch_id = id_match['seq_date'][0]
                 library_prep_method = 'eurofins in-house'
                 used_batch_ids = f'Eurofins_{batch_id}'
                 analysis_pipeline_notes = 'arctic v4'
@@ -537,8 +556,9 @@ def add_tree_info(result_df:pd.DataFrame, nmrl_samples:pd.DataFrame, eurofins_sa
                 }
             for col_name in result_map: result_df.loc[result_df.receiving_lab_sample_id == id, col_name] = result_map[col_name]
 
-#IF ID IS NOT UNIQUE (E.G. MORE THAN ONE SAMPLE WITH THE SAME ID SEQUENCED BY DIFFERENT INSTITUTIONS) (TO BE TESTED)
+#IF ID IS NOT UNIQUE (E.G. MORE THAN ONE SAMPLE WITH THE SAME ID SEQUENCED BY DIFFERENT/SAME INSTITUTIONS) (TO BE TESTED)
         elif len(reported_samples) > 1:
+            # reported_samples.to_csv("/mnt/home/jevgen01/nmrl/cov_analysis/SARS-CoV2_assembly/subscripts/downstream/reported_samples.csv", header=True, index=False)
             for i in reported_samples.index: #ROW INDEX IS USED AS UNIQUE ROW IDENTIFIER (INDECES OF RESULT_DF ARE KEPT)
                 if reported_samples.iloc[i]['seq_institution'] == 'NMRL(LIC)':   #IF SEQUENCING INSTITUTION IS DETERMINED AS NMRL
                     run_folder = nmrl_samples.loc[nmrl_samples.id == id]['run_folder'][0]
@@ -654,11 +674,12 @@ if __name__ == "__main__":
 # RUNNING PANGOLIN IF ALLOWED BY CONTROLLERS
     if not valid_args['skip_pango']: # PROVIDING CORRECT PATH FOR RUN_PANGOLIN.SH & USING SUBPROCESS TO RUN IT WITH OPTIONS FROM CONTROL VARIABLE
         #RUNNING THE COMMAND
+        print(f'Submitting pangolin typing job to HPC.')
         log_path = f'{log_folder_path}{datetime.now().strftime("%Y-%m-%d-%H-%M")}_pangolin.log'
         command = ['qsub', "-o", log_path, "-e", log_path, "-F", f"{1} {source_files_path}", f"{subprocess_path}run_pangolin.sh"]
         subprocess.check_call(command)
         #WAITING FOR JOB TO COMPLETE
-        while not os.path.isfile(f'{source_files_path}/{timestr_fasta}_lineage_report.csv'): time.sleep(30)
+        while not os.path.isfile(f'{source_files_path}/{timestr_fasta}_lineage_report.csv'): time.sleep(30) #whould be a good place for asyncio
         #PATHS TO REPORTS
         pango_report_path = f'{source_files_path}/{timestr_fasta}_lineage_report.csv'
         combined_path = [path for path in os.listdir(source_files_path) if 'combined.fasta' in path][0]

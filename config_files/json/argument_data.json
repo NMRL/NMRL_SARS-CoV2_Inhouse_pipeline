@@ -22,7 +22,8 @@
             ["-sp", "--skip_pango", "(Downstream option) Flag to skip pangolin typing when running downstream module."],
             ["-sh", "--skip_heatmap", "(Downstream option) Flag to skip mutation heatmap update when running downstream module."],
             ["-sd", "--skip_db_update", "(Downstream option) Flag to skip summary file update when running downstream module."],
-            ["-st", "--skip_tessy", "(Downstream option) Flag to skip tessy report generation when running downstream module."]
+            ["-st", "--skip_tessy", "(Downstream option) Flag to skip tessy report generation when running downstream module."],
+            ["-us", "--update_share", "(Downstream option) Flag to copy files to the c19_data_share when running downstream module."]
         ]
     }
 }

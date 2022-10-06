@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -N update_mut_matrix
-#PBS -l walltime=00:40:00
+#PBS -l walltime=02:00:00
 #PBS -l procs=20
 #PBS -l pmem=2g
 #PBS -q batch

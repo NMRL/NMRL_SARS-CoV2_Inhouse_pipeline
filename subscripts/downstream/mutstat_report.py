@@ -50,16 +50,16 @@ if date_1 != None: #IF SELECTING BY DATE RANGE
                             if ".ann.csv" in file:
                                 file_list.append(os.path.join(root,dir,file))
 else: #IF SELECTING BY SAMPLE LIST
-    id_list = list(pd.read_csv(id_list_path, header=0).iloc[:,0]) #CONVERT COLUMN OF IDS TO LIST
+    id_list = list(pd.read_csv(id_list_path, header=0).iloc[:,0].astype(str)) #CONVERT COLUMN OF IDS TO LIST
     for (root,dirs,files) in os.walk("/home/groups/nmrl/cov_analysis/covid_output/", topdown=True): #FINDING PATH TO EACH FILE THAT MATCHES TIME CRITERIA
             for file in files:
                 if '.ann.csv' in file:
                     if 'COV' in file: #IF INHOUSE ID IN FILE NAME
-                       if file.split(".",1)[0][10:] in id_list:
+                        if file.split(".",1)[0][10:] in id_list:
                             file_list.append(os.path.join(root, file))  
                     else: #IF INHOUSE ID NOT IN FILE NAME
                         if file.split(".",1)[0] in id_list:
-                            file_list.append(os.path.join(root, file))  
+                            file_list.append(os.path.join(root, file))
                 
 
 def calculate_statistics(file_list):
@@ -67,9 +67,10 @@ def calculate_statistics(file_list):
     valid_ann_dict = dict()
     sample_count = 0
     for file in file_list:
+        # if not os.stat(file).st_size == 0:
         if 'ann.csv' in file or '_variants.tsv' in file:
             sample_count +=1
-            if len(valid_mut_dict) == 0:
+            if len(valid_mut_dict) == 0 :
                 if 'ann.csv' in file:
                     df = pd.read_csv(file).applymap(str)
                     cur_mut_set = list(df.AMINO_ACID_CHANGE)
@@ -127,6 +128,8 @@ def calculate_statistics(file_list):
                         if mut not in valid_nt_dict.keys():
                             condition = df['AMINOACID_CHANGE'] == mut
                             valid_nt_dict[mut] = df.iloc[df.index[condition], 1].values[0]
+        # else:
+        #     continue
 
     df = pd.DataFrame(data={'Mutation':list(valid_mut_dict.keys()), "Number_of_samples":list(valid_mut_dict.values())})
     df['Annotation'] = df['Mutation'].map(valid_ann_dict)

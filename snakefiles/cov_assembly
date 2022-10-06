@@ -3,6 +3,7 @@ import pandas as pd, re, os
 sip_wild = config['work_dir']+'{sample_id_pattern}_R[1,2]_001.fastq.gz'
 sample_sheet = pd.read_csv(f"{config['output_directory']}sample_sheet.csv")
 
+
 #AGGREGATION RULE
 rule all:
     input:
@@ -10,10 +11,16 @@ rule all:
         multiqc_sif = config['multiqc_sif']
     envmodules:
         'singularity'
+    threads:
+        config['multiqc_threads']
     shell:
         '''
-        echo Sample assembly finished, starting multiqc.
-        singularity run {input.multiqc_sif} multiqc --interactive {config[output_directory]} -o {config[output_directory]}
+        if [ -f {config[output_directory]}multiqc_report.html ]; then
+            echo echo Sample assembly finished, multiqc finished before.
+        else
+            echo Sample assembly finished, starting multiqc.
+            singularity run {input.multiqc_sif} multiqc {config[output_directory]} -o {config[output_directory]} --flat
+        fi
         '''
         
 
@@ -35,6 +42,7 @@ rule adapter_removal: #ok
         singularity run {input.sif_file} cutadapt -a {config[forward_adapter]} -A {config[reverse_adapter]} -o {output.read_1} -p {output.read_2} "{input.read_1}" "{input.read_2}" > {output.cutadapt_report}
         '''
 
+
 rule quality_control: #ok
     input:
         sif_file = config["fastq_sif"], 
@@ -43,8 +51,8 @@ rule quality_control: #ok
     envmodules:
         'singularity'
     output:
-        read_1 = temp(config['output_directory']+'{sample_id_pattern}_quality_filtered_R1.fastq.gz'),
-        read_2 = temp(config['output_directory']+'{sample_id_pattern}_quality_filtered_R2.fastq.gz'),
+        read_1 = temp(config['work_dir']+'{sample_id_pattern}_quality_filtered_R1.fastq.gz'),
+        read_2 = temp(config['work_dir']+'{sample_id_pattern}_quality_filtered_R2.fastq.gz'),
         fastp_report_html = config['output_directory']+'{sample_id_pattern}_fastp_report.html',
         fastp_report_json = config['output_directory']+'{sample_id_pattern}_fastp_report.json'
     shell:
@@ -56,8 +64,8 @@ rule quality_control: #ok
 rule read_alignment: #ok
     input:
         sif_file = config["fastq_sif"], 
-        read_1 = config['output_directory']+'{sample_id_pattern}_quality_filtered_R1.fastq.gz',
-        read_2 = config['output_directory']+'{sample_id_pattern}_quality_filtered_R2.fastq.gz'
+        read_1 = config['work_dir']+'{sample_id_pattern}_quality_filtered_R1.fastq.gz',
+        read_2 = config['work_dir']+'{sample_id_pattern}_quality_filtered_R2.fastq.gz'
     envmodules:
         'singularity'
     output:
@@ -93,16 +101,35 @@ rule indel_realignment: #ok
     input:
         sif_file = config["fastq_sif"],
         sortrimmed_bam = config['output_directory']+'{sample_id_pattern}_trimmed_sorted.bam',
-        index_2 = config['output_directory']+'{sample_id_pattern}_trimmed_sorted.bam.bai'
+        index_2 = config['output_directory']+'{sample_id_pattern}_trimmed_sorted.bam.bai',
+        read_1 = config['work_dir']+'{sample_id_pattern}_R1_001.fastq.gz'
     envmodules:
         'singularity'
+    threads:
+        config["abra_rule_cpus"]
+    # resources:
+    #     mem_mb = config["abra_memory_limit_gb"]*1000
     output:
         sortrimmed_bed = temp(config['work_dir']+'{sample_id_pattern}_trimmed_sorted.bed'),
         realigned_bam = temp(config['work_dir']+'{sample_id_pattern}_unsort_markd.bam')
     shell:
         """
-        singularity run {input.sif_file} bedtools bamtobed -i {input.sortrimmed_bam} > {output.sortrimmed_bed}
-        java -jar -Xmx{config[abra_memory_limit_gb]}G {config[abra_jar_path]} --in {input.sortrimmed_bam} --out {output.realigned_bam} --ref {config[reference_path]} --targets {output.sortrimmed_bed} --working {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/
+        [[ -d {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/ ]] && rm -r {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/
+        mkdir -p {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/
+
+        if [ $(zcat {input.read_1} | echo $((`wc -l`/(4)))) -gt {config[dedup_threshold]} ]; then
+            java -jar {config[picard_jar_path]} MarkDuplicates -I {input.sortrimmed_bam} -O {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_dedup.bam -M {config[output_directory]}{wildcards.sample_id_pattern}_picard_dp.txt --REMOVE_DUPLICATES
+            singularity run {input.sif_file} samtools sort -o {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_dedup.bam
+            singularity run {input.sif_file} samtools index {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam
+            singularity run {input.sif_file} bedtools bamtobed -i {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam > {output.sortrimmed_bed}
+            java -jar -Xmx{config[abra_memory_limit_gb]}G {config[abra_jar_path]} --threads {threads} --in {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam --out {output.realigned_bam} --ref {config[reference_path]} --targets {output.sortrimmed_bed} --tmpdir {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/
+            rm {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_dedup.bam
+            rm {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam
+            rm {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam.bai
+        else
+            singularity run {input.sif_file} bedtools bamtobed -i {input.sortrimmed_bam} > {output.sortrimmed_bed}
+            java -jar -Xmx{config[abra_memory_limit_gb]}G {config[abra_jar_path]} --threads {threads} --in {input.sortrimmed_bam} --out {output.realigned_bam} --ref {config[reference_path]} --targets {output.sortrimmed_bed} --tmpdir {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/
+        fi
         rm -r {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/
         """
 
@@ -123,17 +150,19 @@ rule alignment_quality_control: #ok
         'singularity'
     shell:
         """
+        
         singularity run {input.sif_file} samtools flagstat {input.sorted_raw_bam} > {output.flagstat_report};
         singularity run {input.sif_file} samtools sort -o {output.sorted_realigned_bam} {input.realigned_bam};
         singularity run {input.sif_file} samtools index {output.sorted_realigned_bam};
         singularity run {input.sif_file} samtools depth {output.sorted_realigned_bam} > {output.sequencing_depth};
         mkdir -p {config[output_directory]}{wildcards.sample_id_pattern}_qualimap;
-        singularity run {input.qualimap_path} qualimap bamqc -bam {output.sorted_realigned_bam} -outdir {config[output_directory]}{wildcards.sample_id_pattern}_qualimap --java-mem-size={config[qualimap_memory_limit_gb]}G
+        singularity run {input.qualimap_path} qualimap bamqc -bam {output.sorted_realigned_bam} -outdir {config[output_directory]}{wildcards.sample_id_pattern}_qualimap --java-mem-size={config[qualimap_memory_limit_gb]}G || echo WARNING: No reads mapped to the reference -- {output.sorted_realigned_bam}; touch {output.qualimap_report}
         """
 
 rule variant_calling: #ok
     input:
         sif_file = config["fastq_sif"],
+        index = config['output_directory']+'{sample_id_pattern}_markd.bam.bai',
         sorted_realigned_bam = config['output_directory']+'{sample_id_pattern}_markd.bam'
     output:
         vcf = config['output_directory']+'{sample_id_pattern}.vcf'

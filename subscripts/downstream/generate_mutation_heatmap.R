@@ -76,4 +76,4 @@ heatmap <- data %>% ggplot(aes(sampling_date, Mutation, fill=mutation_frequency,
           date_labels = "%Wned. /%Y") #TICK LABEL FORMAT ON DATE-BASED X-AXIS
 # dev.off()
 p <- ggplotly(heatmap, tooltip='text', height=ceiling(0.3*nrow(data)))#INTERACTIVITY + RESIZING: https://stackoverflow.com/questions/37241985/resize-plotly-r-ggplotly
-saveWidget(p, paste('/mnt/home/groups/nmrl/cov_analysis/mutation_heatmap/mut_heatmap_datamutāciju_apkopojums_',currentDate,".html",sep="")) #SAVE INTERACTIVE PLOT
+saveWidget(p, paste('/mnt/home/groups/nmrl/cov_analysis/mutation_heatmap/mut_heatmap_data/mutāciju_apkopojums_',currentDate,".html",sep="")) #SAVE INTERACTIVE PLOT

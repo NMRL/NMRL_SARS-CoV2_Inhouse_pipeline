@@ -8,11 +8,11 @@ summary_data = summary_data[summary_data['sampling_date'].str.match(r'[0-9]{4}-[
 output_folder = '/mnt/home/groups/nmrl/cov_analysis/mutation_heatmap/mut_heatmap_data/'
 
 def process_mutations(file_path):
-    df = pd.read_csv(file_path) #READ EACH REPORT
     try:
+        df = pd.read_csv(file_path) #READ EACH REPORT
         filtered_df = df[(df['FREQUENCY']>65) & (df['GENE'] == 'S') & (df['ANNOTATION'] != 'synonymous_variant')] #FILTER MUTATIONS BASED ON FREQUENCY
         allowed_mutations = list(set(filtered_df.AMINO_ACID_CHANGE)) #GET LIST OF UNIQUE MUTATIONS
-    except KeyError:
+    except:
         print(file_path)
         return 1
     # ADD UNIQUE MUTATIONS TO THE LIST OF ALL MUTATIONS
@@ -44,7 +44,7 @@ file_list = os.listdir(folder_path) #LIST OF ALL MUTATIONS REPORTS
 print(f'Total files to process: {len(file_list)}')
 total_time = time.time()
 with concurrent.futures.ProcessPoolExecutor() as executor: #APPLY FUNCTION USING MULTIPROCESSING
-        results = [executor.submit(process_mutations, f'{folder_path}/{file}') for file in file_list] #SUBMITTING FUNCTION CALL TO DIFFERENT PROCESSES
+        results = [executor.submit(process_mutations, f'{folder_path}/{file}') for file in file_list if not os.stat(f'{folder_path}/{file}').st_size == 0] #SUBMITTING FUNCTION CALL TO DIFFERENT PROCESSES
         for f in concurrent.futures.as_completed(results): #COLLECTING RESULTS TO A LIST
             result = f.result()
             if result != 1: 
@@ -56,7 +56,7 @@ mutation_set=[mut for mut in set(mutation_set) if str(mut) != 'nan'] #FILTER NAN
 batch_data = pd.DataFrame() #TO STORE RAW MUTATION DATA IN BINARY FORMAT FOR EACH SAMPLE
 mutation_data = pd.DataFrame({'Mutations':mutation_set}) #CONVERT LIST TO DF TO USE PANDAS MATCHING TOOLS
 with concurrent.futures.ProcessPoolExecutor() as executor: #APPLY FUNCTION USING MULTIPROCESSING
-        results = [executor.submit(count_mutation, f'{folder_path}/{file}') for file in file_list] #SUBMITTING FUNCTION CALL TO DIFFERENT PROCESSES
+        results = [executor.submit(count_mutation, f'{folder_path}/{file}') for file in file_list if not os.stat(f'{folder_path}/{file}').st_size == 0] #SUBMITTING FUNCTION CALL TO DIFFERENT PROCESSES
         for f in concurrent.futures.as_completed(results): #COLLECTING RESULTS TO A DATAFRAME
             batch_data = pd.concat([batch_data, f.result()]) 
 batch_data['receiving_lab_sample_id'] = batch_data.index #SET SAMPLE ID AS INDEX FOR MERGING
@@ -108,4 +108,9 @@ os.system(f'mv {output_folder}mutāciju_apkopojums* {output_folder}backup/')
 
 #GENERATING MUTATION PLOT
 os.system(f'Rscript generate_mutation_heatmap.R {output_folder}filtered_mutation_table.csv')
+
+#FIXING HTML ERRORS
+os.system(f"sed 's/¶//g' {output_folder}mutāciju_apkopojums* -i")
+
+
 os.system(f'chmod -R 775 {output_folder}*')
