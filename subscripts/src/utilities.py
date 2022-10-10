@@ -1,4 +1,6 @@
-import os, sys, yaml, pandas as pd, re, argparse, json, base64, requests, numpy as np, urllib
+import os, sys, yaml, pandas as pd, re, argparse, json, base64, requests, numpy as np, urllib, pandas as pd, concurrent.futures
+from math import log10
+from dateutil.relativedelta import relativedelta
 from Bio import SeqIO, Entrez
 from datetime import datetime
 from pathlib import Path
@@ -408,8 +410,7 @@ class Housekeeper:
     def name_job_logs(pipeline_name:str):
         '''Given path to the pipeline_name_job_logs folder, adds sample id to the name of each log file (skips the file if sample id is not found in it).'''
         path_to_log_dir:str=f"{os.path.dirname(Path(__file__).parents[1].absolute())}/{pipeline_name}_job_logs"
-        os.chdir(path_to_log_dir)
-        log_list = [f for f in os.listdir("./") if f"_{pipeline_name}" not in f and "_default" not in f] #if pipeline name in log name is preceeded by _ it is already annotated
+        log_list = [f for f in os.listdir(path_to_log_dir) if f"_{pipeline_name}" not in f and "_default" not in f] #if pipeline name in log name is preceeded by _ it is already annotated
         print(f'\nAdding sample ids to log file names.\n')
         log_count = len(log_list)
         for i,log in enumerate(log_list):
@@ -464,6 +465,139 @@ class Housekeeper:
         # Print New Line on Complete
         if iteration == total: 
             print()
+
+
+    @staticmethod
+    def find_job_logs(pipeline_name:str, logs_to_skip:list=[]) -> list:
+        '''
+        Given pipeline name, returns list of paths (as str) to all log files that contain pipeline name as substring in file name.
+        Returns empty list if none is found. 
+        '''
+        path_to_log_dir:str=f"{os.path.dirname(Path(__file__).parents[1].absolute())}/{pipeline_name}_job_logs" #get path to log folder - static for default pipeline template
+        processed_log_set = set(logs_to_skip) #to use set operations for speedup
+        path_joiner = lambda p: os.path.join(path_to_log_dir, p) #helper function to apply map instead of using for loop
+        full_log_set = set(map(path_joiner, os.listdir(path_to_log_dir))) #applying helper to all log paths to get set of full paths
+        unprocessed_logs = list(full_log_set - processed_log_set) #using set operations to keep only paths to unprocessed logs
+        return unprocessed_logs
+                
+
+    @staticmethod
+    def parse_snakemake_log(path_to_log:str) -> pd.DataFrame:
+        '''Given path to a snakemake log, returns pandas dataframe containing the following fields:
+            log_path <str>
+            job_name <str>
+            input_size_gb <int>
+            is_failed <int8>
+            mem_gb_snakemake <int>
+            cpu_snakemake <int>
+            mem_gb_req <int>
+            time_sec_req <int>
+            ctime_theor <float,2>
+            start_time <datetime>
+            time_sec_total <int>
+            ctime_real <float,2>
+            Eff <float,2>
+        If parsing fails, returns empty pandas dataframe.
+        '''
+
+        ###Static variables
+        smk_job_hdr = 'Building DAG of jobs...'
+        smk_dt_fmt = '%b  %d %H:%M:%S %Y' #expected in snakemake log
+        strt_dt_fmt = '%Y:%m:%d-%H:%M:%S' #stored in dataframe
+        failed_job_tags = [
+            'Will exit after finishing currently running jobs (scheduler).', #snakemake stopped
+            '=>> PBS: job killed:', #resource limit exceeded
+            'Exiting because a job execution failed. Look above for error message', #job failed
+            'Error in rule',
+            ]
+        smk_dt_slc = [5,-1] #slice on a string
+        strt_tm_idx = 0 #in content list
+        end_tm_idx = -3 #in content list
+        job_nm_idx = 1 #in content list
+        jb_nm_slc = [5,-1] #slice on a string
+        cntt_strt_idx = 6 #in content list
+
+
+        ###Reading log file into list
+        with open(path_to_log, 'r+') as handle:
+            header = handle.readline().strip() #Read 1st line without separator characters
+            if header == smk_job_hdr: #If 1st line is valid
+                contents = list(map(str.strip, handle.readlines()))[cntt_strt_idx:] #Reading the remaining contents and removing separator characters
+            else:
+                return pd.DataFrame() #Log is not valid - return empty df
+
+        ###Parsing data from cluster config file
+        cluster_config_dict = Housekeeper.read_yaml(f"{os.path.dirname(Path(__file__).parents[1].absolute())}/config_files/yaml/cluster.yaml")
+        try:
+            ###Pre-processing contents
+            is_failed = 1 if any([tag in row for tag in failed_job_tags for row in contents]) else 0
+            job_start_time = datetime.strptime(contents[strt_tm_idx][smk_dt_slc[0]:smk_dt_slc[1]], smk_dt_fmt) #Parsing start time into datetime object
+            job_end_time = datetime.strptime(contents[end_tm_idx][smk_dt_slc[0]:smk_dt_slc[1]], smk_dt_fmt) if not is_failed else datetime.fromtimestamp(os.path.getctime(path_to_log)) #Parsing end time into datetime object
+            time_sec_total = relativedelta(job_end_time, job_start_time)
+            time_sec_total = time_sec_total.hours*3600+time_sec_total.minutes*60+time_sec_total.seconds #getting job real runtime in seconds according to snakemake
+            job_start_time = datetime.strftime(job_start_time, strt_dt_fmt) #converting start time to string to store in a dataframe
+            job_name = contents[job_nm_idx][jb_nm_slc[0]:jb_nm_slc[1]] #Getting job name
+            smk_ram = int(contents[6].replace('resources: ',"").split(", ")[0].replace('mem_mb=',''))/1024 if 'resources:' in contents[6] else int(contents[7].replace('resources: ',"").split(",")[0].replace('mem_mb=',''))/1024
+            smk_threads = int(contents[6].replace('threads: ',"")) if 'threads' in contents[6] else 1
+            sample_id = contents[5].replace("wildcards: sample_id_pattern=","")
+
+            ###Getting data from cluster config
+            procs_req = int(cluster_config_dict[job_name]['procs'])
+            mem_gb_req = int(cluster_config_dict[job_name]['pmem'].replace('mb',''))*procs_req/1024 if "pmem" in cluster_config_dict[job_name] else int(cluster_config_dict[job_name]['mem'].replace('mb',''))/1024
+            time_sec_req = relativedelta(hours=int(
+                cluster_config_dict[job_name]['walltime'].split(':')[0]),
+                minutes=int(cluster_config_dict[job_name]['walltime'].split(':')[1]),
+                seconds=int(cluster_config_dict[job_name]['walltime'].split(':')[2]))
+            time_sec_req = time_sec_req.hours*3600+time_sec_req.minutes*60+time_sec_req.seconds
+            Eff = round(100*time_sec_total/time_sec_req,2)
+
+            df = pd.DataFrame({
+                "log_path":[path_to_log],
+                "job_name":[job_name],
+                "sample_id":[sample_id],
+                "is_failed":[is_failed],
+                "mem_gb_snakemake":[smk_ram],
+                "cpu_snakemake":[smk_threads],
+                "mem_gb_req":[mem_gb_req],
+                "time_sec_req":[time_sec_req],
+                "start_time":[job_start_time],
+                "time_sec_total":[time_sec_total],
+                "Eff":[Eff]
+            })
+            return df
+        except:
+            return pd.DataFrame()
+        
+
+    @staticmethod
+    def aggregate_job_logs(log_path_list:list, procs:int=24) -> pd.DataFrame:
+        '''
+        Given list of paths to log files of individual jobs of the pipeline, aggregates the log data in the pandas dataframe.
+        Returns empty dataframe if input list is empty. Prints warnings for files that could not be properly parsed by the extractor function.
+        '''
+        aggr_df = pd.DataFrame({
+                    "log_path":[],
+                    "job_name":[],
+                    "sample_id":[],
+                    "is_failed":[],
+                    "mem_gb_snakemake":[],
+                    "cpu_snakemake":[],
+                    "mem_gb_req":[],
+                    "time_sec_req":[],
+                    "time_sec_total":[],
+                    "Eff":[]
+                })
+        with concurrent.futures.ProcessPoolExecutor(max_workers=procs) as executor:
+            results = [executor.submit(Housekeeper.parse_snakemake_log, file_path) for file_path in log_path_list]
+            processed_count = 0 #TO VIEW PROGRESS
+            for output in concurrent.futures.as_completed(results):
+                if not output.result().empty:
+                    aggr_df = pd.concat([aggr_df, output.result()], sort=False)
+                processed_count += 1 #counting processed files
+                Housekeeper.printProgressBar(processed_count, len(log_path_list), prefix = 'Progress:', suffix = 'Complete', length = 50)
+
+        return aggr_df
+        
 
 
 class Query_ncbi:
