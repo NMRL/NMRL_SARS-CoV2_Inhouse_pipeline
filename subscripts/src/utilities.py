@@ -1,5 +1,4 @@
 import os, sys, yaml, pandas as pd, re, argparse, json, base64, requests, numpy as np, urllib, pandas as pd, concurrent.futures
-from math import log10
 from dateutil.relativedelta import relativedelta
 from Bio import SeqIO, Entrez
 from datetime import datetime
@@ -473,7 +472,7 @@ class Housekeeper:
         Given pipeline name, returns list of paths (as str) to all log files that contain pipeline name as substring in file name.
         Returns empty list if none is found. 
         '''
-        path_to_log_dir:str=f"{os.path.dirname(Path(__file__).parents[1].absolute())}/{pipeline_name}_job_logs" #get path to log folder - static for default pipeline template
+        path_to_log_dir=f"{os.path.dirname(Path(__file__).parents[1].absolute())}/{pipeline_name}_job_logs" #get path to log folder - static for default pipeline template
         processed_log_set = set(logs_to_skip) #to use set operations for speedup
         path_joiner = lambda p: os.path.join(path_to_log_dir, p) #helper function to apply map instead of using for loop
         full_log_set = set(map(path_joiner, os.listdir(path_to_log_dir))) #applying helper to all log paths to get set of full paths
@@ -597,7 +596,44 @@ class Housekeeper:
                 Housekeeper.printProgressBar(processed_count, len(log_path_list), prefix = 'Progress:', suffix = 'Complete', length = 50)
 
         return aggr_df
-        
+
+
+    @staticmethod
+    def update_log_summary(notebook_path:str, env_path:str, output_dir:str) -> None:
+        '''Running the notebook from the command line with nbconvert.'''
+        os.system(
+            f'''
+            eval "$(conda shell.bash hook)" 
+            conda activate {env_path}
+            jupyter nbconvert --to html --execute --no-input {notebook_path} --output-dir={output_dir}
+            chmod 775 {output_dir}*
+            ''')
+
+
+    @staticmethod
+    def update_log_history(pipeline_name:str) -> None:
+        '''Updating current job log table & plots'''
+        job_log_dir = f"{os.path.dirname(Path(__file__).parents[1].absolute())}/{pipeline_name}_job_logs"
+        file_search = [path for path in os.listdir(f"{job_log_dir}") if '-log_aggregate_' in path]
+        if file_search: current_file = file_search[0]
+        else: current_file = 'none'
+        if os.path.isfile(f'{job_log_dir}/{current_file}'): 
+            current_df = pd.read_csv(f'{job_log_dir}/{current_file}')
+        else:
+            current_df = None
+        path_list = Housekeeper.find_job_logs(pipeline_name, logs_to_skip=list(current_df['log_path']) if current_df is not None else [])
+        new_log_df = Housekeeper.aggregate_job_logs(log_path_list=path_list)
+        if current_df is not None and not new_log_df.empty: 
+            updated_df = pd.concat([current_df, new_log_df], sort=False)
+        elif new_log_df.empty:
+            updated_df = current_df
+        else:
+            updated_df = new_log_df
+        tstemp = datetime.now().strftime("%Y-%m-%d")
+        new_file_name = f'{tstemp}-log_aggregate_{pipeline_name}.csv'
+        updated_df.to_csv(f'{job_log_dir}/{new_file_name}', header=True, index=False)
+
+
 
 
 class Query_ncbi:
