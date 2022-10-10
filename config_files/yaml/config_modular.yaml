@@ -1,0 +1,85 @@
+#########################
+# Static tool & environment definition paths
+#########################
+home_dir:
+  /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/
+work_dir:
+  /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/temp/
+
+
+##############
+# cov_assembly
+##############
+fastq_sif:
+  /mnt/home/groups/nmrl/image_files/fastq_processing.sif
+multiqc_sif:
+  /mnt/home/groups/nmrl/image_files/fastq_screen.sif
+processing_env: 
+  /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/config_files/conda_defs/local_environment.yml
+assembly_subscripts:
+  /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/subscripts/assembly/
+latest_id_file:
+  /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/assembly/current_id
+
+
+#########################
+# cov_assembly configuration
+#########################
+#cutadapt (QC)
+forward_adapter: AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+reverse_adapter: AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
+
+#fastp (QC)
+fastp_length_filter: 50
+fastp_quality_filter: 30
+
+#bwa (read alignment)
+reference_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/reference_genomes/sars_cov2/MN908947_3.fa
+bwa_verbose_level: 3
+
+#ivar
+##primer_trimming
+primer_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/primers/QIAseqDIRECTSARSCoV2primersfinal.bed
+  #/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/primers/QIAseq_SARSCOV2_primers_v3-13.04.2021.bed
+  #/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/primers/SARSCOV2_primers_v4-29.03.2022.bed
+
+##consensus_calling 
+use_upper_depth_limit: 0 #used by samtools by default (depth above 8000 is diplayed as 8000), not used if 0 is supplied
+cons_quality_filter: 30
+cons_min_variant_supporting_read_fraction: 0.5 #50%
+cons_min_coverage: 15
+
+#abra (indel realignment)
+# abra_jar_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/abra-0.97-SNAPSHOT-jar-with-dependencies_singularity.jar
+abra_jar_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/abra2-2.23.jar
+abra_memory_limit_gb: 40
+abra_rule_cpus: 30
+dedup_threshold: 1000000 #minimum reads per sample to run deduplication
+picard_jar_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/picard.jar
+
+#qualimap (alignment QC)
+qualimap_sif_path: /mnt/home/groups/nmrl/image_files/qualimap_latest.sif
+qualimap_memory_limit_gb: 4
+
+#freebayes (variant calling)
+quality_filter: 20
+coverage_depth_filter: 15
+
+#snpEff (variant annotation)
+snpEff_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/snpEff/snpEff.jar
+snpEff_memory_limit_gb: 8
+snpEff_reference: MN908947
+
+#fastq_screen
+fq_screen_config: db/db-fastq-screen/fastq_screen.conf
+read1_downsample_fraction: 5 #what part of reads will be screened against fqscreen db (expected denominator of a fraction, e.g. if 20% (1/5) of the reads needed, 5 is expected)
+read2_downsample_fraction: 5
+
+#multiqc
+multiqc_threads: 12
+
+###Filled by the wrapper
+assembly_target_files:
+output_directory:
+
+

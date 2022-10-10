@@ -1,0 +1,145 @@
+##############
+# default - any rule for which resources were not defined
+##############
+
+__default__:
+  jobname: "default"
+  procs: 1
+  pmem: "1000mb"
+  walltime: "00:05:00"
+  account: "rakus"
+  queue: "batch"
+  jobout: "oe"
+  outdir: "covipipe_job_logs/"
+
+
+##############
+# cov_assembly
+##############
+all:
+  jobname: "covipipe.aggregation"
+  procs: 5
+  pmem: "3000mb"
+  walltime: "03:00:00"
+  account: "rakus"
+  queue: "batch"
+  jobout: "oe"
+
+
+adapter_removal:
+  jobname: "covipipe.adapter_removal"
+  procs: 12
+  pmem: "1500mb"
+  walltime: "00:15:00"
+  account: "rakus"
+  queue: "batch"
+  jobout: "oe"
+
+
+quality_control:
+  jobname: "covipipe.quality_control"
+  procs: 12
+  pmem: "1500mb"
+  walltime: "00:15:00"
+  account: "rakus"
+  queue: "batch"
+  jobout: "oe"
+
+
+read_alignment:
+  jobname: "covipipe.read_alignment"
+  procs: 12
+  pmem: "1500mb"
+  walltime: "00:15:00"
+  account: "rakus"
+  queue: "batch"
+  jobout: "oe"
+
+
+primer_trimming:
+  jobname: "covipipe.primer_trimming"
+  procs: 12
+  pmem: "1000mb"
+  walltime: "00:15:00"
+  account: "rakus"
+  queue: "batch"
+  jobout: "oe"
+
+
+indel_realignment:
+  jobname: "covipipe.indel_realignment"
+  procs: 30
+  mem: "40000mb"
+  walltime: "05:00:00"
+  account: "rakus"
+  queue: "batch"
+  jobout: "oe"
+
+
+alignment_quality_control:
+  jobname: "covipipe.alignment_quality_control"
+  procs: 12
+  pmem: "1500mb"
+  walltime: "00:15:00"
+  account: "rakus"
+  queue: "batch"
+  jobout: "oe"
+
+
+variant_calling:
+  jobname: "covipipe.variant_calling"
+  procs: 12
+  pmem: "1500mb"
+  walltime: "00:15:00"
+  account: "rakus"
+  queue: "batch"
+  jobout: "oe"
+
+
+variant_annotation:
+  jobname: "covipipe.variant_annotation"
+  procs: 12
+  pmem: "1500mb"
+  walltime: "00:15:00"
+  account: "rakus"
+  queue: "batch"
+  jobout: "oe"
+
+
+consensus_calling:
+  jobname: "covipipe.consensus_calling"
+  procs: 8
+  pmem: "1500mb"
+  walltime: "00:15:00"
+  account: "rakus"
+  queue: "batch"
+  jobout: "oe"
+
+fastq_screening:
+  jobname: "covipipe.fastq_screening"
+  procs: 8
+  pmem: "1500mb"
+  walltime: "00:15:00"
+  account: "rakus"
+  queue: "batch"
+  jobout: "oe"
+
+
+vcf_to_csv:
+  jobname: "covipipe.vcf_to_csv"
+  procs: 8
+  pmem: "1500mb"
+  walltime: "00:15:00"
+  account: "rakus"
+  queue: "batch"
+  jobout: "oe"
+
+
+depth_plot:
+  jobname: "covipipe.depth_plot"
+  procs: 8
+  pmem: "1500mb"
+  walltime: "00:15:00"
+  account: "rakus"
+  queue: "batch"
+  jobout: "oe"
