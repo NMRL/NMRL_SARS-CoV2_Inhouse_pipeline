@@ -4,8 +4,8 @@ import sys
 
 """
 This is a wrapper script of COVIPIPE pipeline.
-Date: 2022-06-13
-Version: 0.0
+Date: 2022-10-10
+Version: 1.0
 """
 
 if __name__ == "__main__":

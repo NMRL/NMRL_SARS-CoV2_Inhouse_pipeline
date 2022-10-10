@@ -409,17 +409,18 @@ class Housekeeper:
     def name_job_logs(pipeline_name:str):
         '''Given path to the pipeline_name_job_logs folder, adds sample id to the name of each log file (skips the file if sample id is not found in it).'''
         path_to_log_dir:str=f"{os.path.dirname(Path(__file__).parents[1].absolute())}/{pipeline_name}_job_logs"
-        log_list = [f for f in os.listdir(path_to_log_dir) if f"_{pipeline_name}" not in f and "_default" not in f] #if pipeline name in log name is preceeded by _ it is already annotated
+        log_list = [f'{path_to_log_dir}/{f}' for f in os.listdir(path_to_log_dir) if f"_{pipeline_name}" not in f and "_default" not in f] #if pipeline name in log name is preceeded by _ it is already annotated
         print(f'\nAdding sample ids to log file names.\n')
         log_count = len(log_list)
         for i,log in enumerate(log_list):
+            Housekeeper.printProgressBar(i+1, log_count, prefix = 'Progress:', suffix = 'Complete', length = 50)
             try:
                 sample_id = Housekeeper.extract_log_id(log)
             except PermissionError:
                 continue
             if sample_id and sample_id not in log: 
                 Housekeeper.rename_file(log, sample_id, path_to_log_dir) #if no sample id is found, the extract_log_id returns False
-            Housekeeper.printProgressBar(i+1, log_count, prefix = 'Progress:', suffix = 'Complete', length = 50)
+
 
 
     @staticmethod
@@ -589,9 +590,13 @@ class Housekeeper:
         with concurrent.futures.ProcessPoolExecutor(max_workers=procs) as executor:
             results = [executor.submit(Housekeeper.parse_snakemake_log, file_path) for file_path in log_path_list]
             processed_count = 0 #TO VIEW PROGRESS
+            print(f'Aggregating job log information: ')
             for output in concurrent.futures.as_completed(results):
-                if not output.result().empty:
-                    aggr_df = pd.concat([aggr_df, output.result()], sort=False)
+                try:
+                    if not output.result().empty:
+                        aggr_df = pd.concat([aggr_df, output.result()], sort=False)
+                except PermissionError:
+                    pass
                 processed_count += 1 #counting processed files
                 Housekeeper.printProgressBar(processed_count, len(log_path_list), prefix = 'Progress:', suffix = 'Complete', length = 50)
 
@@ -606,7 +611,7 @@ class Housekeeper:
             eval "$(conda shell.bash hook)" 
             conda activate {env_path}
             jupyter nbconvert --to html --execute --no-input {notebook_path} --output-dir={output_dir}
-            chmod 775 {output_dir}*
+            chmod 775 {output_dir} 2>/dev/null
             ''')
 
 
