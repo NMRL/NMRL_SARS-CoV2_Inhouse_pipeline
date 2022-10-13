@@ -50,16 +50,15 @@ if date_1 != None: #IF SELECTING BY DATE RANGE
                             if ".ann.csv" in file:
                                 file_list.append(os.path.join(root,dir,file))
 else: #IF SELECTING BY SAMPLE LIST
-    id_list = list(pd.read_csv(id_list_path, header=0).iloc[:,0].astype(str)) #CONVERT COLUMN OF IDS TO LIST
+    id_df = pd.read_csv(id_list_path, header=0).astype(str)
+    full_id_set = set(id_df.iloc[:,1]+"_"+id_df.iloc[:,0]) #CONVERT COLUMN OF IDS TO SET (faster lookup)
+    sample_id_set = set(id_df.iloc[:,0])
+    id_set = full_id_set.union(sample_id_set)
     for (root,dirs,files) in os.walk("/home/groups/nmrl/cov_analysis/covid_output/", topdown=True): #FINDING PATH TO EACH FILE THAT MATCHES TIME CRITERIA
             for file in files:
                 if '.ann.csv' in file:
-                    if 'COV' in file: #IF INHOUSE ID IN FILE NAME
-                        if file.split(".",1)[0][10:] in id_list:
-                            file_list.append(os.path.join(root, file))  
-                    else: #IF INHOUSE ID NOT IN FILE NAME
-                        if file.split(".",1)[0] in id_list:
-                            file_list.append(os.path.join(root, file))
+                    if file.split(".",1)[0] in id_set:
+                        file_list.append(os.path.join(root, file))
                 
 
 def calculate_statistics(file_list):
@@ -70,6 +69,7 @@ def calculate_statistics(file_list):
         # if not os.stat(file).st_size == 0:
         if 'ann.csv' in file or '_variants.tsv' in file:
             sample_count +=1
+            print(sample_count, file)
             if len(valid_mut_dict) == 0 :
                 if 'ann.csv' in file:
                     df = pd.read_csv(file).applymap(str)
