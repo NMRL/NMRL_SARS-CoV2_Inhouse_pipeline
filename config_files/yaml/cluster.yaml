@@ -30,7 +30,7 @@ adapter_removal:
   jobname: "covipipe.adapter_removal"
   procs: 12
   pmem: "1500mb"
-  walltime: "00:06:00"
+  walltime: "00:08:00"
   account: "rakus"
   queue: "batch"
   jobout: "oe"
@@ -68,9 +68,9 @@ primer_trimming:
 
 indel_realignment:
   jobname: "covipipe.indel_realignment"
-  procs: 30
-  mem: "40000mb"
-  walltime: "03:00:00"
+  procs: 12
+  mem: "8000mb"
+  walltime: "00:30:00"
   account: "rakus"
   queue: "batch"
   jobout: "oe"

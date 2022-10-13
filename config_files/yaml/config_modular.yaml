@@ -52,8 +52,8 @@ cons_min_coverage: 15
 #abra (indel realignment)
 # abra_jar_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/abra-0.97-SNAPSHOT-jar-with-dependencies_singularity.jar
 abra_jar_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/abra2-2.23.jar
-abra_memory_limit_gb: 40
-abra_rule_cpus: 30
+abra_memory_limit_gb: 8
+abra_rule_cpus: 12
 dedup_threshold: 1000000 #minimum reads per sample to run deduplication
 picard_jar_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/picard.jar
 

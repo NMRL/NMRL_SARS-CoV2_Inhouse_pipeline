@@ -10,7 +10,8 @@
             ["-o", "--output_dir", "Path to the output directory where the results will be stored (ardetype_output/ by-default).", "covipipe_output/"],
             ["-n", "--num_jobs", "Maximum number of jobs to be run in-parallel on different nodes of HPC (12 by-default).", 12],
             ["-d1", "--start_date", "Strating date of the date range that covers samples to be included in downstream analysis.", null],
-            ["-d2", "--end_date", "Ending date of the date range that covers samples to be included in downstream analysis.", null]
+            ["-d2", "--end_date", "Ending date of the date range that covers samples to be included in downstream analysis.", null],
+            ["-mr", "--max_ram_limit", "Maximum amount of RAM that can be used by all jobs at any time (default 450000Mb (450Gb))", 450000]
         ],
         "flags":[
             ["-s", "--install_snakemake", "Flag to install mamba and snakemake for the current HPC user, if it is not already installed."],

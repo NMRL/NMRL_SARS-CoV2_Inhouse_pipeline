@@ -3,6 +3,8 @@ import pandas as pd, re, os
 sip_wild = config['work_dir']+'{sample_id_pattern}_R[1,2]_001.fastq.gz'
 sample_sheet = pd.read_csv(f"{config['output_directory']}sample_sheet.csv")
 
+def get_mem_mb(wildcards, threads):
+    return threads * 512
 
 #AGGREGATION RULE
 rule all:
@@ -107,8 +109,8 @@ rule indel_realignment: #ok
         'singularity'
     threads:
         config["abra_rule_cpus"]
-    # resources:
-    #     mem_mb = config["abra_memory_limit_gb"]*1000
+    resources:
+        mem_mb = get_mem_mb
     output:
         sortrimmed_bed = temp(config['work_dir']+'{sample_id_pattern}_trimmed_sorted.bed'),
         realigned_bam = temp(config['work_dir']+'{sample_id_pattern}_unsort_markd.bam')
@@ -122,13 +124,13 @@ rule indel_realignment: #ok
             singularity run {input.sif_file} samtools sort -o {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_dedup.bam
             singularity run {input.sif_file} samtools index {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam
             singularity run {input.sif_file} bedtools bamtobed -i {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam > {output.sortrimmed_bed}
-            java -jar -Xmx{config[abra_memory_limit_gb]}G {config[abra_jar_path]} --threads {threads} --in {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam --out {output.realigned_bam} --ref {config[reference_path]} --targets {output.sortrimmed_bed} --tmpdir {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/
+            java -jar -Xmx$(({resources.mem_mb}/(1024) - 1/2))G {config[abra_jar_path]} --threads {threads} --in {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam --out {output.realigned_bam} --ref {config[reference_path]} --targets {output.sortrimmed_bed} --tmpdir {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/
             rm {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_dedup.bam
             rm {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam
             rm {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam.bai
         else
             singularity run {input.sif_file} bedtools bamtobed -i {input.sortrimmed_bam} > {output.sortrimmed_bed}
-            java -jar -Xmx{config[abra_memory_limit_gb]}G {config[abra_jar_path]} --threads {threads} --in {input.sortrimmed_bam} --out {output.realigned_bam} --ref {config[reference_path]} --targets {output.sortrimmed_bed} --tmpdir {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/
+            java -jar -Xmx$(({resources.mem_mb}/(1024) - 1/2))G {config[abra_jar_path]} --threads {threads} --in {input.sortrimmed_bam} --out {output.realigned_bam} --ref {config[reference_path]} --targets {output.sortrimmed_bed} --tmpdir {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/
         fi
         rm -r {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/
         """
