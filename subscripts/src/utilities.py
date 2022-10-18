@@ -638,7 +638,9 @@ class Housekeeper:
         tstemp = datetime.now().strftime("%Y-%m-%d")
         new_file_name = f'{tstemp}-log_aggregate_{pipeline_name}.csv'
         updated_df.drop_duplicates(subset=['log_path'], keep='first', inplace=True)
+        if file_search: os.remove(f'{job_log_dir}/{current_file}')
         updated_df.to_csv(f'{job_log_dir}/{new_file_name}', header=True, index=False)
+
 
 
 
