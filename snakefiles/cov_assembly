@@ -205,7 +205,7 @@ rule consensus_calling: #ok
 
 rule fastq_screening: #ok
     input:
-        fastq_sceen_sif = '/mnt/home/groups/nmrl/image_files/fastq_screen.sif',
+        fastq_sceen_sif = config['multiqc_sif'], #'/mnt/home/groups/nmrl/image_files/fastq_screen.sif',
         read_1 = config['work_dir']+'{sample_id_pattern}_R1_001.fastq.gz',
         read_2 = config['work_dir']+'{sample_id_pattern}_R2_001.fastq.gz'
     output:
