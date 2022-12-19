@@ -1,5 +1,6 @@
 #/bin/bash
 
+mkdir -p ../../tools/images/
 #Build the containers
 for RCP in *.recipe
 do
