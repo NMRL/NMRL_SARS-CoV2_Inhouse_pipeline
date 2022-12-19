@@ -40,7 +40,7 @@ quality_control:
   jobname: "covipipe.quality_control"
   procs: 12
   pmem: "1500mb"
-  walltime: "00:12:00"
+  walltime: "00:20:00" #12Min
   account: "rakus"
   queue: "batch"
   jobout: "oe"
@@ -50,7 +50,7 @@ read_alignment:
   jobname: "covipipe.read_alignment"
   procs: 12
   pmem: "1500mb"
-  walltime: "00:11:00"
+  walltime: "00:30:00" #11
   account: "rakus"
   queue: "batch"
   jobout: "oe"
@@ -60,7 +60,7 @@ primer_trimming:
   jobname: "covipipe.primer_trimming"
   procs: 12
   pmem: "1000mb"
-  walltime: "00:13:00"
+  walltime: "01:30:00" #13Min
   account: "rakus"
   queue: "batch"
   jobout: "oe"
@@ -70,7 +70,7 @@ indel_realignment:
   jobname: "covipipe.indel_realignment"
   procs: 12
   mem: "8000mb"
-  walltime: "00:30:00"
+  walltime: "03:00:00" #30Min
   account: "rakus"
   queue: "batch"
   jobout: "oe"
@@ -80,7 +80,7 @@ alignment_quality_control:
   jobname: "covipipe.alignment_quality_control"
   procs: 12
   pmem: "1500mb"
-  walltime: "00:06:30"
+  walltime: "00:15:30" #6:30
   account: "rakus"
   queue: "batch"
   jobout: "oe"
@@ -90,8 +90,8 @@ variant_calling:
   jobname: "covipipe.variant_calling"
   procs: 12
   pmem: "1500mb"
-  walltime: "00:17:00"
-  account: "rakus"
+  walltime: "00:30:00" #17Min
+  account: "rakus" 
   queue: "batch"
   jobout: "oe"
 
@@ -100,7 +100,7 @@ variant_annotation:
   jobname: "covipipe.variant_annotation"
   procs: 12
   pmem: "1500mb"
-  walltime: "00:02:00"
+  walltime: "00:05:00" #2 min
   account: "rakus"
   queue: "batch"
   jobout: "oe"
@@ -110,7 +110,7 @@ consensus_calling:
   jobname: "covipipe.consensus_calling"
   procs: 8
   pmem: "1500mb"
-  walltime: "00:06:30"
+  walltime: "00:15:30" #6:30
   account: "rakus"
   queue: "batch"
   jobout: "oe"
@@ -119,8 +119,8 @@ fastq_screening:
   jobname: "covipipe.fastq_screening"
   procs: 8
   pmem: "1500mb"
-  walltime: "00:07:00"
-  account: "rakus"
+  walltime: "00:17:00" #7MIn
+  account: "rakus" 
   queue: "batch"
   jobout: "oe"
 
