@@ -1,0 +1,10 @@
+# Untracked files:
+subscripts/__pycache__/*
+subscripts/downstream/__pycache__/*
+subscripts/src/__pycache__/*
+.snakemake/*
+log_summary.html
+covipipe_job_logs/*
+tools/rbase_env/*
+snpEff*
+# Untracked folders:
