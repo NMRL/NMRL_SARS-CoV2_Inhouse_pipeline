@@ -1,0 +1,12 @@
+Bootstrap: docker
+From: continuumio/miniconda3
+
+%post
+	apt-get -y update
+%files
+	../conda_defs/fqc_environment.yml
+%post
+	/opt/conda/bin/conda env create -f fqc_environment.yml
+	
+%runscript
+	exec /opt/conda/envs/fastq_screen_env/bin/"$@"

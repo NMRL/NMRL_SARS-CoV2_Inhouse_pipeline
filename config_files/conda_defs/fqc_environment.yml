@@ -1,0 +1,9 @@
+name: fastq_screen_env
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - fastq-screen=0.14.0=pl5262hdfd78af_1
+  - multiqc=1.11=pyhdfd78af_0
+prefix: /home/user/anaconda3/envs/fastq_screen_env

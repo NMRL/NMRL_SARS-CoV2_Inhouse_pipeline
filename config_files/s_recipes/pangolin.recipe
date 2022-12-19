@@ -1,0 +1,22 @@
+Bootstrap: docker
+From: continuumio/miniconda3
+
+%environment
+	export PATH=/opt/conda/envs/pangolin/bin:$PATH
+
+%post
+	apt-get -y update
+        git clone https://github.com/cov-lineages/pangolin
+        cd pangolin
+	sed -i "$(grep -n 'python>=3.7' /environment.yml | cut -f1 -d:)d" /environment.yml && \
+	sed -i "$(grep -n 'pip=' /environment.yml | cut -f1 -d:)d" /environment.yml
+        /opt/conda/bin/conda env create -f environment.yml
+	PATH=/opt/conda/envs/pangolin/bin:$PATH
+	pip install . && rm -rf /root/.cache/pip
+	pangolin --version &> /pangolin-version.txt
+	pip install snakemake
+	conda env export --name pangolin > /pangolin.yml
+	cd /tmp/
+
+%runscript
+	exec /opt/conda/envs/pangolin/bin/"$@"
