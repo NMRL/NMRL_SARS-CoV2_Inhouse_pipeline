@@ -82,6 +82,11 @@ class Housekeeper:
         Given a pandas dataframe (object), a dictionary where each row in id_column is matched with information to be added (dict, values to be added as one column),
         and a new column name (str), returns a pandas dataframe (object), that contains new column where new information is added to the corresponding row of id_column.
         """
+        if not isinstance(ss_df, pd.DataFrame): raise TypeError('Expected pandas.DataFrame as ss_df')
+        elif not isinstance(info_dict, dict): raise TypeError('Expected dictionary as info_dict')
+        elif id_column not in ss_df.columns: raise KeyError('id_column should be present in ss_df')
+        elif not set(info_dict.keys()).intersection(set(ss_df[id_column])): raise KeyError('No overlap between ids in ss_df.id_column and info_dict')
+
         ss_df[new_col_name] = ss_df[id_column].map(info_dict)
         return ss_df
 
@@ -108,16 +113,15 @@ class Housekeeper:
         Given a nested dictionary (dict), a parameter (key) that needs to be changed,
         and a new value of the parameter, returns edited dictionary were the value of specified parameter is changed.
         (Adjusted from here: https://localcoder.org/recursively-replace-dictionary-values-with-matching-key)
-        Return 0 if key was found and value changed, 1 otherwise.
+        Return 0 if key was found and value changed, None otherwise.
         """
         if param in config_dict:
             config_dict[param] = new_value
             return 0 #this return is reached if key was found and value was changed
-        
-        for param, value in config_dict.items():
-            if isinstance(value, dict):
-                Housekeeper.edit_nested_dict(value, param, new_value)
-        return 1 #this return is reached only when all recursive calls are made and key is not found
+        else:
+            for value in config_dict.values():
+                if isinstance(value, dict):
+                    return Housekeeper.edit_nested_dict(value, param, new_value)
 
     @staticmethod
     def find_in_nested_dict(nested_dict:dict, key_sequence:list):
@@ -125,6 +129,10 @@ class Housekeeper:
         Given a dictionary and an ordered sequence of keys in a form of list, returns value mapped to last key in sequence, by parsing the dictionary. 
         Raises exceptions if key is not found or non-dict value reached before last key in sequence is reached.
         '''
+        if not isinstance(nested_dict,dict):
+            raise TypeError('nested_dict should be a python dictionary')
+        elif not hasattr(key_sequence, 'pop'):
+            raise TypeError('key_sequence should have pop method defined')
 
         key = key_sequence.pop(0)
         try:
@@ -144,9 +152,10 @@ class Housekeeper:
                 elif key == key_sequence[-1]:
                     return tmp_dict[key]
                 elif not isinstance(tmp_dict[key], dict):
-                    raise Exception('Problem with keys: reached non-dict value before processing all keys in sequence.')
+                    raise LookupError('Problem with keys: reached non-dict value before processing all keys in sequence.')
             except KeyError:
-                raise Exception(f'Problem with keys: {key} not found in nested_dict.')
+                raise LookupError(f'Problem with keys: {key} not found in nested_dict.')
+
             
     @staticmethod
     def get_all_keys(input_dict:dict, key_set=set()):
