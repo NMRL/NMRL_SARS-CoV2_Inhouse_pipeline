@@ -37,4 +37,5 @@ jobs:
     - name: Test with unittest
       run: |
 
-        python -m unittest unittests/test_wrapper.py
+        python -m unittest -v unittests/test_utilities.py
+        python -m unittest -v unittests/test_module.py
