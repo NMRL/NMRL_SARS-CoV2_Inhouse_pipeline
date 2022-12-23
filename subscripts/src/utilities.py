@@ -3,7 +3,7 @@ from dateutil.relativedelta import relativedelta
 from Bio import SeqIO, Entrez
 from datetime import datetime
 from pathlib import Path
-
+from shutil import move
 
 class Housekeeper:
     '''Class to contain methods that perform general housekeeping tasks for the pipeline, 
@@ -82,6 +82,11 @@ class Housekeeper:
         Given a pandas dataframe (object), a dictionary where each row in id_column is matched with information to be added (dict, values to be added as one column),
         and a new column name (str), returns a pandas dataframe (object), that contains new column where new information is added to the corresponding row of id_column.
         """
+        if not isinstance(ss_df, pd.DataFrame): raise TypeError('Expected pandas.DataFrame as ss_df')
+        elif not isinstance(info_dict, dict): raise TypeError('Expected dictionary as info_dict')
+        elif id_column not in ss_df.columns: raise KeyError('id_column should be present in ss_df')
+        elif not set(info_dict.keys()).intersection(set(ss_df[id_column])): raise KeyError('No overlap between ids in ss_df.id_column and info_dict')
+
         ss_df[new_col_name] = ss_df[id_column].map(info_dict)
         return ss_df
 
@@ -108,16 +113,15 @@ class Housekeeper:
         Given a nested dictionary (dict), a parameter (key) that needs to be changed,
         and a new value of the parameter, returns edited dictionary were the value of specified parameter is changed.
         (Adjusted from here: https://localcoder.org/recursively-replace-dictionary-values-with-matching-key)
-        Return 0 if key was found and value changed, 1 otherwise.
+        Return 0 if key was found and value changed, None otherwise.
         """
         if param in config_dict:
             config_dict[param] = new_value
             return 0 #this return is reached if key was found and value was changed
-        
-        for param, value in config_dict.items():
-            if isinstance(value, dict):
-                Housekeeper.edit_nested_dict(value, param, new_value)
-        return 1 #this return is reached only when all recursive calls are made and key is not found
+        else:
+            for value in config_dict.values():
+                if isinstance(value, dict):
+                    return Housekeeper.edit_nested_dict(value, param, new_value)
 
     @staticmethod
     def find_in_nested_dict(nested_dict:dict, key_sequence:list):
@@ -125,6 +129,10 @@ class Housekeeper:
         Given a dictionary and an ordered sequence of keys in a form of list, returns value mapped to last key in sequence, by parsing the dictionary. 
         Raises exceptions if key is not found or non-dict value reached before last key in sequence is reached.
         '''
+        if not isinstance(nested_dict,dict):
+            raise TypeError('nested_dict should be a python dictionary')
+        elif not hasattr(key_sequence, 'pop'):
+            raise TypeError('key_sequence should have pop method defined')
 
         key = key_sequence.pop(0)
         try:
@@ -144,9 +152,10 @@ class Housekeeper:
                 elif key == key_sequence[-1]:
                     return tmp_dict[key]
                 elif not isinstance(tmp_dict[key], dict):
-                    raise Exception('Problem with keys: reached non-dict value before processing all keys in sequence.')
+                    raise LookupError('Problem with keys: reached non-dict value before processing all keys in sequence.')
             except KeyError:
-                raise Exception(f'Problem with keys: {key} not found in nested_dict.')
+                raise LookupError(f'Problem with keys: {key} not found in nested_dict.')
+
             
     @staticmethod
     def get_all_keys(input_dict:dict, key_set=set()):
@@ -290,43 +299,6 @@ class Housekeeper:
         '''
         SeqIO.write([record for record in SeqIO.parse(input_multifasta_path, "fasta") if len(record.seq) > minlen], output_multifasta_path, "fasta")
 
-    @staticmethod
-    def check_file_multiplicity(file_path_list:list):
-        '''
-        Function checks if list of file paths contains files that are multiplicated files (e.g. paired fastq files).
-        Returns integer, indicating multiplicity of files in the list. Raises an error if multiplicity is greater than 1000.
-        Assumes the same multiplicity for all files in the list (e.g. list sould only contain path to pair-end or single-end fastq, but not both)
-        '''
-        get_file_names = np.vectorize(lambda x: os.path.basename(x))
-        file_names = get_file_names(np.array(file_path_list))
-        current_array = np.array(list(file_names[0]))
-        current_multiplicity, current_order = 1, 0
-        for name in file_names[1:]:
-            array = np.array(list(name))
-            try:
-                comparison_arr = array == current_array
-                if comparison_arr.sum() == len(current_array):
-                    return current_multiplicity
-
-                comparison = comparison_arr.sum() >= len(current_array) - 3
-                if comparison:
-                    diff_index = np.where(~comparison_arr)[0][0]
-                    diff_num = abs(int(current_array[diff_index]) - int(array[diff_index])) == 1
-                    if diff_num:
-                        current_multiplicity += 1
-                        current_array = array                   
-                    else:
-                        return current_multiplicity
-                else:
-                    return current_multiplicity
-            except ValueError:
-                if int("".join(array[diff_index:diff_index+current_order+1])) // 10 == 0:
-                    current_order += 1
-                    current_multiplicity += 1
-                    current_array = array
-                else:
-                    return current_multiplicity
-        return current_multiplicity
         
     @staticmethod
     def parse_arguments(arg_dict:dict):
@@ -382,7 +354,21 @@ class Housekeeper:
         Given path_to_folder string, representing a path in linux-based system,
         recursively assigns permissions (775 by-default) to all files in the folder.
         '''
-        os.system(f"chmod {linux_permissions} -R {path_to_folder} 2> /dev/null")
+        for root, dirs, files in os.walk(path_to_folder):
+            for d in dirs:
+                try:
+                    os.chmod(os.path.join(root, d), int(linux_permissions, 8))
+                except PermissionError:
+                    continue
+            for f in files:
+                try:
+                    os.chmod(os.path.join(root, f), int(linux_permissions, 8))
+                except PermissionError:
+                    continue
+        try:
+            os.chmod(path_to_folder, int(linux_permissions, 8))
+        except PermissionError:
+            pass
 
     @staticmethod
     def extract_log_id(path_to_log:str, pattern_to_search:str="wildcards: sample_id_pattern=.*"):
@@ -402,7 +388,7 @@ class Housekeeper:
         saves file in the same directory with pattern added to its name.
         '''
         new_path = f"{target_folder_path}/{pattern_to_add}_{os.path.basename(path_to_file)}"
-        os.system(f"mv {path_to_file} {new_path}")
+        move(path_to_file,new_path)
 
 
     @staticmethod 
@@ -468,17 +454,20 @@ class Housekeeper:
 
 
     @staticmethod
-    def find_job_logs(pipeline_name:str, logs_to_skip:list=[]) -> list:
+    def find_job_logs(pipeline_name:str, logs_to_skip:list=[]):
         '''
-        Given pipeline name, returns list of paths (as str) to all log files that contain pipeline name as substring in file name.
+        Given pipeline name, returns generator of paths (as str) to all log files that contain pipeline name as substring in file name.
         Returns empty list if none is found. 
         '''
         path_to_log_dir=f"{os.path.dirname(Path(__file__).parents[1].absolute())}/{pipeline_name}_job_logs" #get path to log folder - static for default pipeline template
         processed_log_set = set(logs_to_skip) #to use set operations for speedup
         path_joiner = lambda p: os.path.join(path_to_log_dir, p) #helper function to apply map instead of using for loop
         full_log_set = set(map(path_joiner, os.listdir(path_to_log_dir))) #applying helper to all log paths to get set of full paths
-        unprocessed_logs = list(full_log_set - processed_log_set) #using set operations to keep only paths to unprocessed logs
-        return unprocessed_logs
+        fresh_logs = full_log_set - processed_log_set
+        if fresh_logs: 
+            return (path for path in fresh_logs), len(fresh_logs) #using set operations to keep only paths to unprocessed logs + generator to avoid loading all 
+        else:
+            return [], 0
                 
 
     @staticmethod
@@ -571,7 +560,7 @@ class Housekeeper:
         
 
     @staticmethod
-    def aggregate_job_logs(log_path_list:list, procs:int=24) -> pd.DataFrame:
+    def aggregate_job_logs(log_path_list:list, count:int, procs:int=24) -> pd.DataFrame:
         '''
         Given list of paths to log files of individual jobs of the pipeline, aggregates the log data in the pandas dataframe.
         Returns empty dataframe if input list is empty. Prints warnings for files that could not be properly parsed by the extractor function.
@@ -599,7 +588,7 @@ class Housekeeper:
                 except PermissionError:
                     pass
                 processed_count += 1 #counting processed files
-                Housekeeper.printProgressBar(processed_count, len(log_path_list), prefix = 'Progress:', suffix = 'Complete', length = 50)
+                Housekeeper.printProgressBar(processed_count, count, prefix = 'Progress:', suffix = 'Complete', length = 50)
 
         return aggr_df
 
@@ -627,8 +616,8 @@ class Housekeeper:
             current_df = pd.read_csv(f'{job_log_dir}/{current_file}')
         else:
             current_df = None
-        path_list = Housekeeper.find_job_logs(pipeline_name, logs_to_skip=list(current_df['log_path']) if current_df is not None else [])
-        new_log_df = Housekeeper.aggregate_job_logs(log_path_list=path_list)
+        path_gen, log_count = Housekeeper.find_job_logs(pipeline_name, logs_to_skip=list(current_df['log_path']) if current_df is not None else [])
+        new_log_df = Housekeeper.aggregate_job_logs(log_path_list=path_gen, count=log_count)
         if current_df is not None and not new_log_df.empty: 
             updated_df = pd.concat([current_df, new_log_df], sort=False)
         elif new_log_df.empty:
