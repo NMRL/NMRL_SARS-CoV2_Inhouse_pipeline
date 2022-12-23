@@ -9,4 +9,5 @@ tools/rbase_env/*
 snpEff*
 unittests/__pycache__/*
 __pycache__/*
+temp/*
 # Untracked folders:
