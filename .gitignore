@@ -8,4 +8,5 @@ covipipe_job_logs/*
 tools/rbase_env/*
 snpEff*
 unittests/__pycache__/*
+temp/*
 # Untracked folders:
