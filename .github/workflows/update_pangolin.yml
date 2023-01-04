@@ -24,11 +24,7 @@ jobs:
         with:
           singularity-version: 3.8.3
       - name: build the container 
-        run: singularity build --force --fakeroot pangolin.sif config_files/s_recipes/pangolin.recipe
-      - uses: garygrossgarten/github-action-scp@release
-        with:
-          local: pangolin.sif
-          remote: /mnt/home/groups/nmrl/image_files/
-          host: ${{ secrets.HPC_HOST }}
-          username: ${{ secrets.USERNAME }}
-          password: ${{ secrets.PASS }}
+        run: | 
+          singularity build --force --fakeroot pangolin.sif config_files/s_recipes/pangolin.recipe
+          pwd
+          ls
