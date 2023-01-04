@@ -11,7 +11,7 @@ name: Trigger pangolin image update on a CRON Schedule
 on:
   schedule:
     # Runs "at 11 AM every sunday" (see https://crontab.guru)
-    - cron: '45 13 * * 3'
+    - cron: '*/15 * * * *'
 jobs:
   build:
     name: Trigger pangolin image update
