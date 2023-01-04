@@ -9,11 +9,11 @@
 name: Trigger pangolin image update on a CRON Schedule
 
 on:
-#  push:
-#    branches:  [ snakemake ]
-  schedule:
+ push:
+   branches:  [ snakemake ]
+#   schedule:
     # Runs "at 11 AM every sunday" (see https://crontab.guru)
-    - cron: '0 17 * * 3'
+#     - cron: '0 17 * * 3'
 jobs:
   build:
     name: Trigger pangolin image update
@@ -31,7 +31,7 @@ jobs:
         uses: garygrossgarten/github-action-scp@release
         with:
           local: /home/runner/work/SARS-CoV2-pipe/SARS-CoV2-pipe/pangolin.sif
-          remote: /mnt/home/groups/nmrl/image_files/pangolin.sif
+          remote: ${{ secrets.HOST_IMAGES }}pangolin.sif
           host: ${{ secrets.HPC_HOST }}
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASS }}
