@@ -9,11 +9,11 @@
 name: Trigger pangolin image update on a CRON Schedule
 
 on:
-  push:
-    branches:  [ snakemake ]
+#  push:
+#    branches:  [ snakemake ]
   schedule:
     # Runs "at 11 AM every sunday" (see https://crontab.guru)
-    - cron: '45 13 * * 3'
+    - cron: '0 17 * * 3'
 jobs:
   build:
     name: Trigger pangolin image update
@@ -26,6 +26,7 @@ jobs:
       - name: build the container 
         run: | 
           singularity build --force --fakeroot pangolin.sif config_files/s_recipes/pangolin.recipe
+          chmod 775 pangolin.sif
       - name: Copy single file to remote
         uses: garygrossgarten/github-action-scp@release
         with:
