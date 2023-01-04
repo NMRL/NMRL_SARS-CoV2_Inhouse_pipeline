@@ -1,4 +1,11 @@
 # .github/workflows/update_pangolin.yml
+# Setting-up singularity: https://github.com/marketplace/actions/setup-singularity
+# Crond schedule basics: https://www.digitalocean.com/community/tutorials/how-to-use-cron-to-automate-tasks-ubuntu-1804
+# Run actions on cron schedule: https://docs.getnacelle.com/deployment/scheduled-builds-github-actions.html#add-the-webhook-url
+# SSH copy: https://github.com/marketplace/actions/copy-via-ssh
+# Encrypted secrets: https://docs.github.com/en/actions/security-guides/encrypted-secrets
+
+
 name: Trigger pangolin image update on a CRON Schedule
 
 on:
