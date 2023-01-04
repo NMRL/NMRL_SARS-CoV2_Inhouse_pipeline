@@ -11,16 +11,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: build the container 
-      - uses: actions/checkout@v2
-      - uses: eWaterCycle/setup-singularity@v7
-        with:
-          singularity-version: 3.8.3
-        run: singularity build --force --fakeroot pangolin.sif config_files/s_recipes/pangolin.recipe
+        uses: actions/checkout@v2
+        uses: eWaterCycle/setup-singularity@v7
+          with:
+            singularity-version: 3.8.3
+          run: singularity build --force --fakeroot pangolin.sif config_files/s_recipes/pangolin.recipe
       - name: scp to HPC
-      - uses: garygrossgarten/github-action-scp@release
-      - with:
-          local: pangolin.sif
-          remote: /mnt/home/groups/nmrl/image_files/
-          host: ${{ secrets.HPC_HOST }}
-          username: ${{ secrets.USERNAME }}
-          password: ${{ secrets.PASS }}
+        uses: garygrossgarten/github-action-scp@release
+        with:
+            local: pangolin.sif
+            remote: /mnt/home/groups/nmrl/image_files/
+            host: ${{ secrets.HPC_HOST }}
+            username: ${{ secrets.USERNAME }}
+            password: ${{ secrets.PASS }}
