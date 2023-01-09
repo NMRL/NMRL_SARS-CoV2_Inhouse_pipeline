@@ -11,3 +11,4 @@ unittests/__pycache__/*
 __pycache__/*
 temp/*
 # Untracked folders:
+#testing actions
