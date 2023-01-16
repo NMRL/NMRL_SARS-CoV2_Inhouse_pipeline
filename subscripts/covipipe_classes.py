@@ -1,4 +1,4 @@
-import re, os, pandas as pd, concurrent.futures, subprocess, sys
+import re, os, pandas as pd, concurrent.futures, subprocess, sys, json
 from turtle import down
 from datetime import datetime
 from subscripts.covipipe_utilities import covipipe_housekeeper as hk
@@ -173,19 +173,37 @@ class Covid_assembly(Module):
         '''Renames processed files using self.renamed_result_file_map and creates a renaming log file in the output directory'''
         if self.backward_result_file_map:
             total_count = len(self.backward_result_file_map)
-            processed_count = 0
-            annotation_logs = []
-            with concurrent.futures.ProcessPoolExecutor() as executor:
-                print(f"Reannotating output files with processing ids:\n{total_count} total output files.") #announcing to the terminal
-                results = [executor.submit(hk.renamer, path, self.backward_result_file_map[path]) for path in self.backward_result_file_map] #submitting function calls to different processes
-                for f in concurrent.futures.as_completed(results):
-                    result = f.result()
-                    annotation_logs.append(result)
-                    processed_count += 1
-                    hk.printProgressBar(processed_count, total_count, prefix = 'Progress:', suffix = 'Complete', length = 50)
-            print(f"Result annotation finished!\n") #report completion
-            with open(f'{self.output_path}result_annotation.log', 'w+') as ann_log: #opening log file for writing  
-                for log in annotation_logs: ann_log.write(log)         
+            if list(self.backward_result_file_map.keys())[0] == self.output_path:
+                processed_count = 0
+                annotation_logs = []
+                with concurrent.futures.ProcessPoolExecutor() as executor:
+                    print(f"Reannotating output files with processing ids:\n{total_count} total output files.") #announcing to the terminal
+                    results = [executor.submit(hk.renamer, path, self.backward_result_file_map[path]) for path in self.backward_result_file_map] #submitting function calls to different processes
+                    for f in concurrent.futures.as_completed(results):
+                        result = f.result()
+                        annotation_logs.append(result)
+                        processed_count += 1
+                        hk.printProgressBar(processed_count, total_count, prefix = 'Progress:', suffix = 'Complete', length = 50)
+                print(f"Result annotation finished!\n") #report completion
+                with open(f'{self.output_path}result_annotation.log', 'w+') as ann_log: #opening log file for writing  
+                    for log in annotation_logs: ann_log.write(log)
+            else:
+                updated_path = {}
+                for path in self.backward_result_file_map:
+                    updated_path[os.path.join(self.output_path, os.path.basename(path))] = os.path.join(self.output_path, os.path.basename(self.backward_result_file_map[path]))
+                processed_count = 0
+                annotation_logs = []
+                with concurrent.futures.ProcessPoolExecutor() as executor:
+                    print(f"Reannotating output files with processing ids:\n{total_count} total output files.") #announcing to the terminal
+                    results = [executor.submit(hk.renamer, path, updated_path[path]) for path in updated_path] #submitting function calls to different processes
+                    for f in concurrent.futures.as_completed(results):
+                        result = f.result()
+                        annotation_logs.append(result)
+                        processed_count += 1
+                        hk.printProgressBar(processed_count, total_count, prefix = 'Progress:', suffix = 'Complete', length = 50)
+                print(f"Result annotation finished!\n") #report completion
+                with open(f'{self.output_path}result_annotation.log', 'w+') as ann_log: #opening log file for writing  
+                    for log in annotation_logs: ann_log.write(log)      
         else:
             total_count = len(self.renamed_result_file_map)
             processed_count = 0
@@ -518,7 +536,11 @@ def run_assembly(args, num_jobs):
         assembly.check_module_output()
         assembly.compute_processing_ids()
         assembly.fill_output_file_maps()
-        assembly.annotate_processed_files()
+        try:
+            assembly.annotate_processed_files()
+        except Exception as e:
+            assembly.clear_working_directory()
+            raise e
         assembly.switch_sample_ids()
         assembly.write_sample_sheet()
         assembly.clear_working_directory()

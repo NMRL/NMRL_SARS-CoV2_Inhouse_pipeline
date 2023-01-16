@@ -2,9 +2,9 @@
 # Static tool & environment definition paths
 #########################
 home_dir:
-  /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/
+  /mnt/home/groups/nmrl/demo/CLUSTER/bact-cov-meta-etc/SARS-CoV2-pipe/
 work_dir:
-  /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/temp/
+  /mnt/home/groups/nmrl/demo/CLUSTER/bact-cov-meta-etc/SARS-CoV2-pipe/temp/
 subscript_path:
   /mnt/home/groups/nmrl/demo/CLUSTER/bact-cov-meta-etc/SARS-CoV2-pipe/subscripts
 
@@ -17,11 +17,11 @@ fastq_sif:
 multiqc_sif:
   /mnt/home/groups/nmrl/image_files/fastq_screen.sif
 processing_env: 
-  /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/config_files/conda_defs/local_environment.yml
+  /mnt/home/groups/nmrl/demo/CLUSTER/bact-cov-meta-etc/SARS-CoV2-pipe/config_files/conda_defs/local_environment.yml
 assembly_subscripts:
-  /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/subscripts/assembly/
+  /mnt/home/groups/nmrl/demo/CLUSTER/bact-cov-meta-etc/SARS-CoV2-pipe/subscripts/assembly/
 latest_id_file:
-  /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/assembly/current_id
+  /mnt/home/groups/nmrl/demo/CLUSTER/bact-cov-meta-etc/SARS-CoV2-pipe/resources/assembly/current_id
 
 
 #########################
@@ -36,14 +36,14 @@ fastp_length_filter: 50
 fastp_quality_filter: 30
 
 #bwa (read alignment)
-reference_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/reference_genomes/sars_cov2/MN908947_3.fa
+reference_path: /mnt/home/groups/nmrl/demo/CLUSTER/bact-cov-meta-etc/SARS-CoV2-pipe/resources/reference_genomes/sars_cov2/MN908947_3.fa
 bwa_verbose_level: 3
 
 #ivar
 ##primer_trimming
-primer_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/primers/QIAseqDIRECTSARSCoV2primersfinal.bed
-  #/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/primers/QIAseq_SARSCOV2_primers_v3-13.04.2021.bed
-  #/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/primers/SARSCOV2_primers_v4-29.03.2022.bed
+primer_path: /mnt/home/groups/nmrl/demo/CLUSTER/bact-cov-meta-etc/SARS-CoV2-pipe/resources/primers/QIAseqDIRECTSARSCoV2primersfinal.bed
+  #/mnt/home/groups/nmrl/demo/CLUSTER/bact-cov-meta-etc/SARS-CoV2-pipe/resources/primers/QIAseq_SARSCOV2_primers_v3-13.04.2021.bed
+  #/mnt/home/groups/nmrl/demo/CLUSTER/bact-cov-meta-etc/SARS-CoV2-pipe/resources/primers/SARSCOV2_primers_v4-29.03.2022.bed
 
 ##consensus_calling 
 use_upper_depth_limit: 0 #used by samtools by default (depth above 8000 is diplayed as 8000), not used if 0 is supplied
@@ -52,12 +52,12 @@ cons_min_variant_supporting_read_fraction: 0.5 #50%
 cons_min_coverage: 15
 
 #abra (indel realignment)
-# abra_jar_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/abra-0.97-SNAPSHOT-jar-with-dependencies_singularity.jar
-abra_jar_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/abra2-2.23.jar
+# abra_jar_path: /mnt/home/groups/nmrl/demo/CLUSTER/bact-cov-meta-etc/SARS-CoV2-pipe/tools/abra-0.97-SNAPSHOT-jar-with-dependencies_singularity.jar
+abra_jar_path: /mnt/home/groups/nmrl/demo/CLUSTER/bact-cov-meta-etc/SARS-CoV2-pipe/tools/abra2-2.23.jar
 abra_memory_limit_gb: 8
 abra_rule_cpus: 12
 dedup_threshold: 1000000 #minimum reads per sample to run deduplication
-picard_jar_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/picard.jar
+picard_jar_path: /mnt/home/groups/nmrl/demo/CLUSTER/bact-cov-meta-etc/SARS-CoV2-pipe/tools/picard.jar
 
 #qualimap (alignment QC)
 qualimap_sif_path: /mnt/home/groups/nmrl/image_files/qualimap_latest.sif
@@ -68,7 +68,7 @@ quality_filter: 20
 coverage_depth_filter: 15
 
 #snpEff (variant annotation)
-snpEff_path: /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/snpEff/snpEff.jar
+snpEff_path: /mnt/home/groups/nmrl/demo/CLUSTER/bact-cov-meta-etc/SARS-CoV2-pipe/tools/snpEff/snpEff.jar
 snpEff_memory_limit_gb: 8
 snpEff_reference: MN908947
 
