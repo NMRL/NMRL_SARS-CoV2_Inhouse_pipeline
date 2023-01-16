@@ -1,5 +1,8 @@
 #define sample_id_pattern wildcard and accessing sample_sheet
 import pandas as pd, re, os
+sys.path.insert(0, config['subscript_path'])
+from wrappers import Wrapper as wp
+
 sip_wild = config['work_dir']+'{sample_id_pattern}_R[1,2]_001.fastq.gz'
 sample_sheet = pd.read_csv(f"{config['output_directory']}sample_sheet.csv")
 
@@ -16,14 +19,16 @@ rule all:
     threads:
         config['multiqc_threads']
     shell:
-        '''
-        if [ -f {config[output_directory]}multiqc_report.html ]; then
-            echo echo Sample assembly finished, multiqc finished before.
-        else
-            echo Sample assembly finished, starting multiqc.
-            singularity run {input.multiqc_sif} multiqc {config[output_directory]} -o {config[output_directory]} --flat
-        fi
-        '''
+        os.system(
+'''
+if [ -f {config[output_directory]}multiqc_report.html ]; then
+    echo echo Sample assembly finished, multiqc finished before.
+else
+    echo Sample assembly finished, starting multiqc.
+    singularity run {input.multiqc_sif} multiqc {config[output_directory]} -o {config[output_directory]} --flat
+fi
+'''
+        )
         
 
 rule adapter_removal: #ok
