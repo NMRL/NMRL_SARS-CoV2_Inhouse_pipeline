@@ -1,5 +1,8 @@
+
+import pandas as pd, gzip, re, os, json, sys
+from pathlib import Path
+sys.path.insert(0, os.path.dirname(os.path.dirname(Path(__file__).absolute())))
 from subscripts.src.utilities import Housekeeper as hk
-import pandas as pd, gzip, re, os
 
 class covipipe_housekeeper(hk):
     '''Class extends the standard housekeeper class to implement functions required by specific pipeline'''
@@ -84,7 +87,7 @@ class Wrapper():
     '''Toolkit class to store wrapper methods for different tools'''
 
     @staticmethod
-    def parse_fastp(path_to_report:str) -> dict:
+    def parse_fastp(sample_id:str, path_to_report:str) -> dict:
         '''Serializes report as python dictionary'''
         mri_map = {
             'failed_avq':   ["filtering_result", "low_quality_reads"],
@@ -104,45 +107,47 @@ class Wrapper():
             'cmd':          ["command"]
         }
         report = hk.read_json_dict(path_to_report)
-        return {mri:hk.find_in_nested_dict(report, mri_map[mri]) for mri in mri_map}
+        data = {mri:hk.find_in_nested_dict(report, mri_map[mri]) for mri in mri_map}
+        with open(f'{os.path.dirname(path_to_report)}{sample_id}_fastp_et.json', 'w+') as f: json.dump(data,f)
             
     @staticmethod
-    def parse_fqscreen(path_to_report:str, target_organism:str='SarsCoV2') -> dict:
+    def parse_fqscreen(sample_id:str, path_to_report:str, target_organism:str='SarsCoV2') -> dict:
         '''Serializes report as python dictionary'''
         df = pd.read_csv(path_to_report, sep='\t')
         new_header = df.iloc[0]
         df.columns = new_header
         df = df[:-1]
         data = {df.index[i][0]:[df.index[i][4],df.index[i][5]] for i in range(1,len(df)) if df.index[i][0] == target_organism}
-        return data
+        with open(f'{os.path.dirname(path_to_report)}{sample_id}_fqscreen_et.json', 'w+') as f: json.dump(data,f)
 
     @staticmethod
-    def parse_ivar(path_to_report:str) -> dict:
+    def parse_ivar(sample_id:str, path_to_report:str) -> dict:
         '''Serializes report as python dictionary'''
         df = pd.read_csv(path_to_report, sep='\n')[19:-5]
         new_header = df.iloc[0].get_values()[0].split('\t')
         df[new_header] = df[df.columns[0]].str.split('\t', expand = True)
         data = df[new_header][1:].set_index('Primer Name').to_dict()
-        return data
+        with open(f'{os.path.dirname(path_to_report)}{sample_id}_ivar_et.json', 'w+') as f: json.dump(data,f)
 
     @staticmethod
-    def parse_qualimap(path_to_report_cov:str, path_to_report_qual:str) -> dict:
+    def parse_qualimap(sample_id:str, path_to_report_cov:str, path_to_report_qual:str) -> dict:
         '''Serializes report as python dictionary'''
         gen_cov_hist = pd.read_csv(path_to_report_cov, sep='\t')
         gen_cov_hist = {gen_cov_hist.columns[0]: list(gen_cov_hist[gen_cov_hist.columns[0]]), gen_cov_hist.columns[1]: list(gen_cov_hist[gen_cov_hist.columns[1]])}
         gen_mapq_hist = pd.read_csv(path_to_report_qual, sep='\t')
         gen_mapq_hist = {gen_mapq_hist.columns[0]: list(gen_mapq_hist[gen_mapq_hist.columns[0]]), gen_mapq_hist.columns[1]: list(gen_mapq_hist[gen_mapq_hist.columns[1]])}
         data = {**gen_cov_hist, **gen_mapq_hist}
-        return data
+        with open(f'{os.path.dirname(os.path.dirname(os.path.dirname(path_to_report_cov)))}{sample_id}_qmap_et.json', 'w+') as f: json.dump(data,f)
 
     @staticmethod
-    def parse_samtools(path_to_report:str) -> dict:
+    def parse_samtools(sample_id:str, path_to_report:str) -> dict:
         '''Serializes report as python dictionary'''
         with open(path_to_report, 'r+') as f:
             lines = f.readlines()
-        return {'reads_mapped':lines[4].strip().split(' ')[0]}
+        data = {'reads_mapped':lines[4].strip().split(' ')[0]}
+        with open(f'{os.path.dirname(path_to_report)}{sample_id}_samtools_et.json', 'w+') as f: json.dump(data,f)
 
-if __name__ == "__main__":
-    print('''
-Module to define tool-specific wrappers to be used from snakefile.
-    ''')
+
+    @staticmethod
+    def combine_jsons(sample_id:str, *report_paths) -> None:
+        pass

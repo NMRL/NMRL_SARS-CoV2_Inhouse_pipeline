@@ -1,36 +1,38 @@
 {
-    "cluster_config":"/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/config_files/yaml/cluster.yaml",
-    "snakefiles":{
-        "assembly":"/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/snakefiles/cov_assembly",
-        "downstream":"/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/snakefiles/cov_downstream"
+    "cluster_config": "/mnt/home/jevgen01/nmrl/demo/CLUSTER/bact-cov-meta-etc/SARS-CoV2-pipe/config_files/yaml/cluster.yaml",
+    "snakefiles": {
+        "assembly": "/mnt/home/jevgen01/nmrl/demo/CLUSTER/bact-cov-meta-etc/SARS-CoV2-pipe/snakefiles/cov_assembly"
     },
-    "assembly" : {
-        "targets":[
-                "_qualimap/qualimapReport.html",
-                "_1_screen.txt",
-                "_2_screen.txt",
-                "_1_screen.html",
-                "_2_screen.html",
-                "_consensus.fasta",
-                "_cutadapt_log.txt",
-                "_fastp_report.html",
-                "_fastp_report.json",
-                "_ivar_log.txt",
-                "_mapped_report.txt",
-                "_seq_depth_plot.html",
-                "_seq_depth.txt",
-                "_sorted.bam",
-                ".ann.csv",
-                ".vcf"
+    "assembly": {
+        "targets": [
+            "_qualimap/qualimapReport.html",
+            "_1_screen.txt",
+            "_2_screen.txt",
+            "_1_screen.html",
+            "_2_screen.html",
+            "_consensus.fasta",
+            "_cutadapt_log.txt",
+            "_fastp_report.html",
+            "_fastp_report.json",
+            "_ivar_log.txt",
+            "_mapped_report.txt",
+            "_seq_depth_plot.html",
+            "_seq_depth.txt",
+            "_sorted.bam",
+            ".ann.csv",
+            ".vcf",
+            "_combined.json"
         ],
-        "patterns":{
-            "inputs":["001.fastq.gz"],
-            "sample_sheet":"_R[1,2]_001.fastq.gz"
+        "patterns": {
+            "inputs": [
+                "001.fastq.gz"
+            ],
+            "sample_sheet": "_R[1,2]_001.fastq.gz"
         },
-        "job_name":"cov_assembly",
-        "requests":{
-            "check":null,
-            "taxonomy":null
+        "job_name": "cov_assembly",
+        "requests": {
+            "check": null,
+            "taxonomy": null
         }
     }
 }

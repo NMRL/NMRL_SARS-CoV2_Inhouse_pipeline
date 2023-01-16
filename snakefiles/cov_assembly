@@ -1,7 +1,7 @@
 #define sample_id_pattern wildcard and accessing sample_sheet
 import pandas as pd, re, os
 sys.path.insert(0, config['subscript_path'])
-from wrappers import Wrapper as wp
+from covipipe_utilities import Wrapper as wp
 
 sip_wild = config['work_dir']+'{sample_id_pattern}_R[1,2]_001.fastq.gz'
 sample_sheet = pd.read_csv(f"{config['output_directory']}sample_sheet.csv")
@@ -19,16 +19,15 @@ rule all:
     threads:
         config['multiqc_threads']
     shell:
-        os.system(
-'''
-if [ -f {config[output_directory]}multiqc_report.html ]; then
-    echo echo Sample assembly finished, multiqc finished before.
-else
-    echo Sample assembly finished, starting multiqc.
-    singularity run {input.multiqc_sif} multiqc {config[output_directory]} -o {config[output_directory]} --flat
-fi
-'''
-        )
+        '''
+        if [ -f {config[output_directory]}multiqc_report.html ]; then
+            echo echo Sample assembly finished, multiqc finished before.
+        else
+            echo Sample assembly finished, starting multiqc.
+            singularity run {input.multiqc_sif} multiqc {config[output_directory]} -o {config[output_directory]} --flat
+        fi
+        '''
+
         
 
 rule adapter_removal: #ok
@@ -55,17 +54,23 @@ rule quality_control: #ok
         sif_file = config["fastq_sif"], 
         read_1 = config['work_dir']+'{sample_id_pattern}_adapter_trimmed_R1.fastq.gz',
         read_2 = config['work_dir']+'{sample_id_pattern}_adapter_trimmed_R2.fastq.gz'
-    envmodules:
-        'singularity'
+    # envmodules:
+    #     'singularity'
     output:
+        temp(config['output_directory']+'{sample_id_pattern}_fastp_et.json'),
         read_1 = temp(config['work_dir']+'{sample_id_pattern}_quality_filtered_R1.fastq.gz'),
         read_2 = temp(config['work_dir']+'{sample_id_pattern}_quality_filtered_R2.fastq.gz'),
         fastp_report_html = config['output_directory']+'{sample_id_pattern}_fastp_report.html',
         fastp_report_json = config['output_directory']+'{sample_id_pattern}_fastp_report.json'
-    shell:
-        """
-        singularity run {input.sif_file} fastp -y -p -h {output.fastp_report_html} -j {output.fastp_report_json} -i {input.read_1} -I {input.read_2} -o {output.read_1} -O {output.read_2} -l {config[fastp_length_filter]} -q {config[fastp_quality_filter]}
-        """
+        
+    run:
+        os.system(
+"""
+module load singularity
+singularity run {input.sif_file} fastp -y -p -h {output.fastp_report_html} -j {output.fastp_report_json} -i {input.read_1} -I {input.read_2} -o {output.read_1} -O {output.read_2} -l {config[fastp_length_filter]} -q {config[fastp_quality_filter]}
+"""
+        )
+        wp.parse_fastp(wildcards.sample_id_pattern, output.fastp_report_json)
 
 
 rule read_alignment: #ok
@@ -80,28 +85,33 @@ rule read_alignment: #ok
     shell:
         """
         singularity run {input.sif_file} bwa mem {config[reference_path]} -v {config[bwa_verbose_level]} {input.read_1} {input.read_2} | singularity run {input.sif_file} samtools view -bS - | singularity run {input.sif_file} samtools sort -o {output.sorted_bam}
-        """
+        """     
 
 
 rule primer_trimming: #ok
     input:
         sif_file = config["fastq_sif"],
         sorted_bam = config['output_directory']+'{sample_id_pattern}_sorted.bam'
-    envmodules:
-        'singularity'
+    # envmodules:
+    #     'singularity'
     output:
+        temp(config['output_directory']+'{sample_id_pattern}_ivar_et.json'),
         trimmed_bam = temp(config['output_directory']+'{sample_id_pattern}_trimmed.bam'),
         index_1 = temp(config['output_directory']+'{sample_id_pattern}_sorted.bam.bai'),
         sortrimmed_bam = temp(config['output_directory']+'{sample_id_pattern}_trimmed_sorted.bam'),
         index_2 = temp(config['output_directory']+'{sample_id_pattern}_trimmed_sorted.bam.bai'),
         ivar_log = config['output_directory']+'{sample_id_pattern}_ivar_log.txt'
-    shell:
-        """
-        singularity run {input.sif_file} samtools index {input.sorted_bam}
-        singularity run {input.sif_file} ivar trim -e -b {config[primer_path]} -p {output.trimmed_bam} -i {input.sorted_bam} > {output.ivar_log}
-        singularity run {input.sif_file} samtools sort -o {output.sortrimmed_bam} {output.trimmed_bam}
-        singularity run {input.sif_file} samtools index {output.sortrimmed_bam}
-        """
+    run:
+        os.system(
+"""
+module load singularity
+singularity run {input.sif_file} samtools index {input.sorted_bam}
+singularity run {input.sif_file} ivar trim -e -b {config[primer_path]} -p {output.trimmed_bam} -i {input.sorted_bam} > {output.ivar_log}
+singularity run {input.sif_file} samtools sort -o {output.sortrimmed_bam} {output.trimmed_bam}
+singularity run {input.sif_file} samtools index {output.sortrimmed_bam}
+"""
+        )
+        wp.parse_ivar(wildcards.sample_id_pattern, output.ivar_log)
 
 
 rule indel_realignment: #ok
@@ -148,23 +158,33 @@ rule alignment_quality_control: #ok
         sorted_raw_bam = config['output_directory']+'{sample_id_pattern}_sorted.bam',
         realigned_bam = config['work_dir']+'{sample_id_pattern}_unsort_markd.bam'
     output:
+        temp(config['output_directory']+'{sample_id_pattern}_samtools_et.json'),
+        temp(config['output_directory']+'{sample_id_pattern}_qmap_et.json'),
         flagstat_report = config['output_directory']+'{sample_id_pattern}_mapped_report.txt',
         sequencing_depth = config['output_directory']+'{sample_id_pattern}_seq_depth.txt',
         sorted_realigned_bam = temp(config['output_directory']+'{sample_id_pattern}_markd.bam'),
         index = temp(config['output_directory']+'{sample_id_pattern}_markd.bam.bai'),
         qualimap_report = config['output_directory']+'{sample_id_pattern}_qualimap/qualimapReport.html'
-    envmodules:
-        'singularity'
-    shell:
-        """
-        
-        singularity run {input.sif_file} samtools flagstat {input.sorted_raw_bam} > {output.flagstat_report};
-        singularity run {input.sif_file} samtools sort -o {output.sorted_realigned_bam} {input.realigned_bam};
-        singularity run {input.sif_file} samtools index {output.sorted_realigned_bam};
-        singularity run {input.sif_file} samtools depth {output.sorted_realigned_bam} > {output.sequencing_depth};
-        mkdir -p {config[output_directory]}{wildcards.sample_id_pattern}_qualimap;
-        singularity run {input.qualimap_path} qualimap bamqc -bam {output.sorted_realigned_bam} -outdir {config[output_directory]}{wildcards.sample_id_pattern}_qualimap --java-mem-size={config[qualimap_memory_limit_gb]}G || echo WARNING: No reads mapped to the reference -- {output.sorted_realigned_bam}; touch {output.qualimap_report}
-        """
+    # envmodules:
+    #     'singularity'
+    run:
+        os.system(
+"""
+module load singularity
+singularity run {input.sif_file} samtools flagstat {input.sorted_raw_bam} > {output.flagstat_report};
+singularity run {input.sif_file} samtools sort -o {output.sorted_realigned_bam} {input.realigned_bam};
+singularity run {input.sif_file} samtools index {output.sorted_realigned_bam};
+singularity run {input.sif_file} samtools depth {output.sorted_realigned_bam} > {output.sequencing_depth};
+mkdir -p {config[output_directory]}{wildcards.sample_id_pattern}_qualimap;
+singularity run {input.qualimap_path} qualimap bamqc -bam {output.sorted_realigned_bam} -outdir {config[output_directory]}{wildcards.sample_id_pattern}_qualimap --java-mem-size={config[qualimap_memory_limit_gb]}G || echo WARNING: No reads mapped to the reference -- {output.sorted_realigned_bam}; touch {output.qualimap_report}
+"""
+            )
+        wp.parse_qualimap(
+            wildcards.sample_id_pattern, 
+            config['output_directory']+'{wildcards.sample_id_pattern}_qualimap/'+'raw_data_qualimapReport/coverage_across_reference.txt', 
+            config['output_directory']+'{wildcards.sample_id_pattern}_qualimap/'+'raw_data_qualimapReport/mapping_quality_across_reference.txt'
+            )
+        wp.parse_samtools(wildcards.sample_id_pattern, output.flagstat_report)
 
 rule variant_calling: #ok
     input:
@@ -214,25 +234,33 @@ rule fastq_screening: #ok
         read_1 = config['work_dir']+'{sample_id_pattern}_R1_001.fastq.gz',
         read_2 = config['work_dir']+'{sample_id_pattern}_R2_001.fastq.gz'
     output:
+        temp(config["output_directory"]+"{sample_id_pattern}_fqscreen_et.json"),
         read_1_profile_txt = config["output_directory"]+"{sample_id_pattern}_1_screen.txt",
         read_1_profile_html = config["output_directory"]+"{sample_id_pattern}_1_screen.html",
         read_2_profile_txt = config["output_directory"]+"{sample_id_pattern}_2_screen.txt",
         read_2_profile_html = config["output_directory"]+"{sample_id_pattern}_2_screen.html"
-    envmodules:
-        'singularity'
-    shell:
-        """
-        cd /home/groups/nmrl/
-        downsample_r1=$(zcat {input.read_1} | echo $((`wc -l`/(4*{config[read1_downsample_fraction]}))))
-        downsample_r2=$(zcat {input.read_2} | echo $((`wc -l`/(4*{config[read2_downsample_fraction]}))))
-        singularity run {input.fastq_sceen_sif} fastq_screen --subset $downsample_r1 -conf {config[fq_screen_config]} {input.read_1} --outdir {config[output_directory]}
-        singularity run {input.fastq_sceen_sif} fastq_screen --subset $downsample_r2 -conf {config[fq_screen_config]} {input.read_2} --outdir {config[output_directory]}
-        mv {config[output_directory]}{wildcards.sample_id_pattern}_*R1*_screen.txt {output.read_1_profile_txt}
-        mv {config[output_directory]}{wildcards.sample_id_pattern}_*R1*_screen.html {output.read_1_profile_html}
-        mv {config[output_directory]}{wildcards.sample_id_pattern}_*R2*_screen.txt {output.read_2_profile_txt}
-        mv {config[output_directory]}{wildcards.sample_id_pattern}_*R2*_screen.html {output.read_2_profile_html}
-        """
+
+    # envmodules:
+    #     'singularity'
+    run:
+        os.system(
+"""
+module load singularity
+cd /home/groups/nmrl/
+downsample_r1=$(zcat {input.read_1} | echo $((`wc -l`/(4*{config[read1_downsample_fraction]}))))
+downsample_r2=$(zcat {input.read_2} | echo $((`wc -l`/(4*{config[read2_downsample_fraction]}))))
+singularity run {input.fastq_sceen_sif} fastq_screen --subset $downsample_r1 -conf {config[fq_screen_config]} {input.read_1} --outdir {config[output_directory]}
+singularity run {input.fastq_sceen_sif} fastq_screen --subset $downsample_r2 -conf {config[fq_screen_config]} {input.read_2} --outdir {config[output_directory]}
+mv {config[output_directory]}{wildcards.sample_id_pattern}_*R1*_screen.txt {output.read_1_profile_txt}
+mv {config[output_directory]}{wildcards.sample_id_pattern}_*R1*_screen.html {output.read_1_profile_html}
+mv {config[output_directory]}{wildcards.sample_id_pattern}_*R2*_screen.txt {output.read_2_profile_txt}
+mv {config[output_directory]}{wildcards.sample_id_pattern}_*R2*_screen.html {output.read_2_profile_html}
+"""
+        )
+        wp.parse_fqscreen(wildcards.sample_id_pattern, output.read_1_profile_txt)
+        wp.parse_fqscreen(wildcards.sample_id_pattern, output.read_2_profile_txt)
         
+
 rule vcf_to_csv: #ok
     input:
         sif_file = config["fastq_sif"],
@@ -247,6 +275,7 @@ rule vcf_to_csv: #ok
         singularity run {input.sif_file} python {config[assembly_subscripts]}vcf_to_csv_cmd.py {input.annotated_variants} {output.annotated_csv}
         '''
 
+
 rule depth_plot: #ok
     input:
         sif_file = config["fastq_sif"],
@@ -260,3 +289,16 @@ rule depth_plot: #ok
         """
         singularity run {input.sif_file} python {config[assembly_subscripts]}depth_plot.py {input.sequencing_depth} {output.sequencing_depth_plot}
         """
+
+
+rule get_json:
+    input:
+        samtools=config['output_directory']+'{sample_id_pattern}_samtools_et.json',
+        fqs=config["output_directory"]+"{sample_id_pattern}_fqscreen_et.json",
+        qmap=config['output_directory']+'{sample_id_pattern}_qmap_et.json',
+        ivar=config['output_directory']+'{sample_id_pattern}_ivar_et.json',
+        fastp=config['output_directory']+'{sample_id_pattern}_fastp_et.json'
+    output:
+        config['output_directory']+'{sample_id_pattern}_combined.json'
+    run:
+        wp.combine_jsons(wildcards.sample_id_pattern, [input.samtools, input.fqs, input.qmap, input.ivar, input.fastp])
