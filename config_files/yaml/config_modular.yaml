@@ -5,6 +5,8 @@ home_dir:
   /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/
 work_dir:
   /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/temp/
+subscript_path:
+  /mnt/home/groups/nmrl/demo/CLUSTER/bact-cov-meta-etc/SARS-CoV2-pipe/subscripts
 
 
 ##############
