@@ -108,7 +108,7 @@ class Wrapper():
         }
         report = hk.read_json_dict(path_to_report)
         data = {mri:hk.find_in_nested_dict(report, mri_map[mri]) for mri in mri_map}
-        with open(f'{os.path.dirname(path_to_report)}{sample_id}_fastp_et.json', 'w+') as f: json.dump(data,f)
+        with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_fastp_et.json', 'w+') as f: json.dump(data,f)
             
     @staticmethod
     def parse_fqscreen(sample_id:str, path_to_report:str, target_organism:str='SarsCoV2') -> dict:
@@ -118,16 +118,16 @@ class Wrapper():
         df.columns = new_header
         df = df[:-1]
         data = {df.index[i][0]:[df.index[i][4],df.index[i][5]] for i in range(1,len(df)) if df.index[i][0] == target_organism}
-        with open(f'{os.path.dirname(path_to_report)}{sample_id}_fqscreen_et.json', 'w+') as f: json.dump(data,f)
+        with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_fqscreen_et.json', 'w+') as f: json.dump(data,f)
 
     @staticmethod
     def parse_ivar(sample_id:str, path_to_report:str) -> dict:
         '''Serializes report as python dictionary'''
-        df = pd.read_csv(path_to_report, sep='\n')[19:-5]
-        new_header = df.iloc[0].get_values()[0].split('\t')
+        df = pd.read_csv(path_to_report, sep='\n', lineterminator='\n')[19:-5].reset_index(drop=True)
+        new_header = df.iloc[0].values[0].split('\t')
         df[new_header] = df[df.columns[0]].str.split('\t', expand = True)
         data = df[new_header][1:].set_index('Primer Name').to_dict()
-        with open(f'{os.path.dirname(path_to_report)}{sample_id}_ivar_et.json', 'w+') as f: json.dump(data,f)
+        with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_ivar_et.json', 'w+') as f: json.dump(data,f)
 
     @staticmethod
     def parse_qualimap(sample_id:str, path_to_report_cov:str, path_to_report_qual:str) -> dict:
@@ -137,7 +137,7 @@ class Wrapper():
         gen_mapq_hist = pd.read_csv(path_to_report_qual, sep='\t')
         gen_mapq_hist = {gen_mapq_hist.columns[0]: list(gen_mapq_hist[gen_mapq_hist.columns[0]]), gen_mapq_hist.columns[1]: list(gen_mapq_hist[gen_mapq_hist.columns[1]])}
         data = {**gen_cov_hist, **gen_mapq_hist}
-        with open(f'{os.path.dirname(os.path.dirname(os.path.dirname(path_to_report_cov)))}{sample_id}_qmap_et.json', 'w+') as f: json.dump(data,f)
+        with open(f'{os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(path_to_report_cov))))}/{sample_id}_qmap_et.json', 'w+') as f: json.dump(data,f)
 
     @staticmethod
     def parse_samtools(sample_id:str, path_to_report:str) -> dict:
@@ -145,9 +145,17 @@ class Wrapper():
         with open(path_to_report, 'r+') as f:
             lines = f.readlines()
         data = {'reads_mapped':lines[4].strip().split(' ')[0]}
-        with open(f'{os.path.dirname(path_to_report)}{sample_id}_samtools_et.json', 'w+') as f: json.dump(data,f)
+        with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_samtools_et.json', 'w+') as f: json.dump(data,f)
 
 
     @staticmethod
-    def combine_jsons(sample_id:str, *report_paths) -> None:
-        pass
+    def combine_jsons(sample_id:str, output_path:str, report_paths:list) -> None:
+        data = {}
+        for path in report_paths:
+            with open(path, 'r+') as f:
+                data[os.path.basename(path)] = json.load(f)
+        
+        with open(f'{output_path}{sample_id}_combined.json', 'w+') as f:
+            json.dump(data,f, indent=4)
+        
+        
