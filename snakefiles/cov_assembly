@@ -65,9 +65,9 @@ rule quality_control: #ok
         
     run:
         os.system(
-"""
+f"""
 module load singularity
-singularity run {input.sif_file} fastp -y -p -h {output.fastp_report_html} -j {output.fastp_report_json} -i {input.read_1} -I {input.read_2} -o {output.read_1} -O {output.read_2} -l {config[fastp_length_filter]} -q {config[fastp_quality_filter]}
+singularity run {input.sif_file} fastp -y -p -h {output.fastp_report_html} -j {output.fastp_report_json} -i {input.read_1} -I {input.read_2} -o {output.read_1} -O {output.read_2} -l {config['fastp_length_filter']} -q {config['fastp_quality_filter']}
 """
         )
         wp.parse_fastp(wildcards.sample_id_pattern, output.fastp_report_json)
@@ -103,10 +103,10 @@ rule primer_trimming: #ok
         ivar_log = config['output_directory']+'{sample_id_pattern}_ivar_log.txt'
     run:
         os.system(
-"""
+f"""
 module load singularity
 singularity run {input.sif_file} samtools index {input.sorted_bam}
-singularity run {input.sif_file} ivar trim -e -b {config[primer_path]} -p {output.trimmed_bam} -i {input.sorted_bam} > {output.ivar_log}
+singularity run {input.sif_file} ivar trim -e -b {config['primer_path']} -p {output.trimmed_bam} -i {input.sorted_bam} > {output.ivar_log}
 singularity run {input.sif_file} samtools sort -o {output.sortrimmed_bam} {output.trimmed_bam}
 singularity run {input.sif_file} samtools index {output.sortrimmed_bam}
 """
@@ -169,20 +169,20 @@ rule alignment_quality_control: #ok
     #     'singularity'
     run:
         os.system(
-"""
+f"""
 module load singularity
 singularity run {input.sif_file} samtools flagstat {input.sorted_raw_bam} > {output.flagstat_report};
 singularity run {input.sif_file} samtools sort -o {output.sorted_realigned_bam} {input.realigned_bam};
 singularity run {input.sif_file} samtools index {output.sorted_realigned_bam};
 singularity run {input.sif_file} samtools depth {output.sorted_realigned_bam} > {output.sequencing_depth};
-mkdir -p {config[output_directory]}{wildcards.sample_id_pattern}_qualimap;
-singularity run {input.qualimap_path} qualimap bamqc -bam {output.sorted_realigned_bam} -outdir {config[output_directory]}{wildcards.sample_id_pattern}_qualimap --java-mem-size={config[qualimap_memory_limit_gb]}G || echo WARNING: No reads mapped to the reference -- {output.sorted_realigned_bam}; touch {output.qualimap_report}
+mkdir -p {config['output_directory']}{wildcards.sample_id_pattern}_qualimap;
+singularity run {input.qualimap_path} qualimap bamqc -bam {output.sorted_realigned_bam} -outdir {config[output_directory]}{wildcards.sample_id_pattern}_qualimap --java-mem-size={config['qualimap_memory_limit_gb']}G || echo WARNING: No reads mapped to the reference -- {output.sorted_realigned_bam}; touch {output.qualimap_report}
 """
             )
         wp.parse_qualimap(
             wildcards.sample_id_pattern, 
-            config['output_directory']+'{wildcards.sample_id_pattern}_qualimap/'+'raw_data_qualimapReport/coverage_across_reference.txt', 
-            config['output_directory']+'{wildcards.sample_id_pattern}_qualimap/'+'raw_data_qualimapReport/mapping_quality_across_reference.txt'
+            config['output_directory']+f'{wildcards.sample_id_pattern}_qualimap/'+'raw_data_qualimapReport/coverage_across_reference.txt', 
+            config['output_directory']+f'{wildcards.sample_id_pattern}_qualimap/'+'raw_data_qualimapReport/mapping_quality_across_reference.txt'
             )
         wp.parse_samtools(wildcards.sample_id_pattern, output.flagstat_report)
 
@@ -244,17 +244,17 @@ rule fastq_screening: #ok
     #     'singularity'
     run:
         os.system(
-"""
+f"""
 module load singularity
 cd /home/groups/nmrl/
-downsample_r1=$(zcat {input.read_1} | echo $((`wc -l`/(4*{config[read1_downsample_fraction]}))))
-downsample_r2=$(zcat {input.read_2} | echo $((`wc -l`/(4*{config[read2_downsample_fraction]}))))
-singularity run {input.fastq_sceen_sif} fastq_screen --subset $downsample_r1 -conf {config[fq_screen_config]} {input.read_1} --outdir {config[output_directory]}
-singularity run {input.fastq_sceen_sif} fastq_screen --subset $downsample_r2 -conf {config[fq_screen_config]} {input.read_2} --outdir {config[output_directory]}
-mv {config[output_directory]}{wildcards.sample_id_pattern}_*R1*_screen.txt {output.read_1_profile_txt}
-mv {config[output_directory]}{wildcards.sample_id_pattern}_*R1*_screen.html {output.read_1_profile_html}
-mv {config[output_directory]}{wildcards.sample_id_pattern}_*R2*_screen.txt {output.read_2_profile_txt}
-mv {config[output_directory]}{wildcards.sample_id_pattern}_*R2*_screen.html {output.read_2_profile_html}
+downsample_r1=$(zcat {input.read_1} | echo $((`wc -l`/(4*{config['read1_downsample_fraction']}))))
+downsample_r2=$(zcat {input.read_2} | echo $((`wc -l`/(4*{config['read2_downsample_fraction']}))))
+singularity run {input.fastq_sceen_sif} fastq_screen --subset $downsample_r1 -conf {config['fq_screen_config']} {input.read_1} --outdir {config['output_directory']}
+singularity run {input.fastq_sceen_sif} fastq_screen --subset $downsample_r2 -conf {config['fq_screen_config']} {input.read_2} --outdir {config['output_directory']}
+mv {config['output_directory']}{wildcards.sample_id_pattern}_*R1*_screen.txt {output.read_1_profile_txt}
+mv {config['output_directory']}{wildcards.sample_id_pattern}_*R1*_screen.html {output.read_1_profile_html}
+mv {config['output_directory']}{wildcards.sample_id_pattern}_*R2*_screen.txt {output.read_2_profile_txt}
+mv {config['output_directory']}{wildcards.sample_id_pattern}_*R2*_screen.html {output.read_2_profile_html}
 """
         )
         wp.parse_fqscreen(wildcards.sample_id_pattern, output.read_1_profile_txt)
@@ -301,4 +301,4 @@ rule get_json:
     output:
         config['output_directory']+'{sample_id_pattern}_combined.json'
     run:
-        wp.combine_jsons(wildcards.sample_id_pattern, [input.samtools, input.fqs, input.qmap, input.ivar, input.fastp])
+        wp.combine_jsons(wildcards.sample_id_pattern, config['output_directory'], [input.samtools, input.fqs, input.qmap, input.ivar, input.fastp])
