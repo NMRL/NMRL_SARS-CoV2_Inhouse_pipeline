@@ -123,8 +123,9 @@ class Wrapper():
     @staticmethod
     def parse_ivar(sample_id:str, path_to_report:str) -> dict:
         '''Serializes report as python dictionary'''
-        df = pd.read_csv(path_to_report, sep='\n', lineterminator='\n')[19:-5].reset_index(drop=True)
+        df = pd.read_csv(path_to_report, sep='\r\n', engine='python')[19:-5].reset_index(drop=True)
         new_header = df.iloc[0].values[0].split('\t')
+        df.columns=df.iloc[0].values
         df[new_header] = df[df.columns[0]].str.split('\t', expand = True)
         data = df[new_header][1:].set_index('Primer Name').to_dict()
         with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_ivar_et.json', 'w+') as f: json.dump(data,f)
