@@ -1,6 +1,5 @@
 from subscripts.covipipe_classes import run_all, run_assembly, run_downstream
 from subscripts.covipipe_utilities import covipipe_housekeeper as hk 
-import sys
 
 """
 This is a wrapper script of COVIPIPE pipeline.
