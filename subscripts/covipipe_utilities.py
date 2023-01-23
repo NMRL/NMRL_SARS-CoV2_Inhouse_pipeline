@@ -114,7 +114,12 @@ class Wrapper():
     _ivar_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} ivar -v 2> /dev/null', stdout=sp.PIPE, shell=True).stdout.decode('utf=8').split('\n')[0]
     _qualimap_version = sp.run(f'module load singularity && singularity run {_config_dict["qualimap_sif_path"]} qualimap bamqc --version 2> /dev/null', stdout=sp.PIPE, shell=True).stdout.decode('utf-8').split('\n')[3]
     _samtools_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} samtools --version 2> /dev/null', stdout=sp.PIPE, shell=True).stdout.decode('utf=8').split('\n')[0]
-
+    _bwamem_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} bwa ', stderr=sp.PIPE, shell=True).stderr.decode('utf=8').split('\n')[2]
+    _picard_version = sp.run(f'java -jar {_config_dict["picard_jar_path"]} MarkDuplicates --version', stderr=sp.PIPE, shell=True).stderr.decode('utf-8').strip()
+    _abra_version = sp.run(f'java -jar {_config_dict["abra_jar_path"]} --version', stderr=sp.PIPE, shell=True).stderr.decode('utf-8').strip().split('\t')[2].split('\n')[0]
+    _snpeff_version = sp.run(f'java -jar {_config_dict["snpEff_path"]} -version', stdout=sp.PIPE, shell=True).stdout.decode('utf-8').strip().replace('\t',' ')
+    _freebayes_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} freebayes --version ', stdout=sp.PIPE, shell=True).stdout.decode('utf=8').strip()
+    
 
     @staticmethod
     def parse_fastp(sample_id:str, path_to_report:str) -> dict:
