@@ -1,5 +1,5 @@
 
-import pandas as pd, gzip, re, os, json, sys
+import pandas as pd, gzip, re, os, json, sys, subprocess as sp
 from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(Path(__file__).absolute())))
 from subscripts.src.utilities import Housekeeper as hk
@@ -86,30 +86,56 @@ class covipipe_housekeeper(hk):
 class Wrapper():
     '''Toolkit class to store wrapper methods for different tools'''
 
+    _config_dict = hk.read_yaml("./config_files/yaml/config_modular.yaml")
+    _fastp_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} fastp --version', stderr=sp.PIPE, shell=True).stderr.decode('utf-8').strip()
+    _fastqc_version = sp.run(f'module load singularity && singularity run {_config_dict["multiqc_sif"]} fastq_screen --version 2> /dev/null', stdout=sp.PIPE, shell=True).stdout.decode('utf=8').strip()
+    _ivar_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} ivar -v 2> /dev/null', stdout=sp.PIPE, shell=True).stdout.decode('utf=8').split('\n')[0]
+    _qualimap_version = sp.run(f'module load singularity && singularity run {_config_dict["qualimap_sif_path"]} qualimap bamqc --version 2> /dev/null', stdout=sp.PIPE, shell=True).stdout.decode('utf-8').split('\n')[3]
+    _samtools_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} samtools --version 2> /dev/null', stdout=sp.PIPE, shell=True).stdout.decode('utf=8').split('\n')[0]
+
+
     @staticmethod
     def parse_fastp(sample_id:str, path_to_report:str) -> dict:
         '''Serializes report as python dictionary'''
         mri_map = {
-            'failed_avq':   ["filtering_result", "low_quality_reads"],
-            'failed_msb':   ["filtering_result", "too_many_N_reads"],
-            'failed_cpx':   ["filtering_result", "low_complexity_reads"],
-            'failed-len':   ["filtering_result", "too_short_reads"],
-            'bcaf_histr1':  ["read1_after_filtering", "content_curves"],
-            'bqaf_histr1':  ["read1_after_filtering", "quality_curves"],
-            'bcaf_histr2':  ["read2_after_filtering", "content_curves"],
-            'bqaf_histr2':  ["read2_after_filtering", "quality_curves"],
-            'rpf_r1':       ["read1_after_filtering","total_reads"],
-            'rpf_r2':       ["read2_after_filtering","total_reads"],
-            'avlnaf_r1':    ["summary", "after_filtering", "read1_mean_length"],
-            'avlnaf_r2':    ["summary", "after_filtering", "read2_mean_length"],
-            'gc_af':        ["summary", "after_filtering", "gc_content"],
-            'q30_af':       ["summary", "after_filtering", "q30_rate"],
-            'cmd':          ["command"]
+            'before_filtering':         ['summary','before_filtering'],
+            'after_filtering':          ['summary', 'after_filtering'],
+            'filtering_results':        ['filtering_result'],
+            'duplication':              ['duplication', 'rate'],
+            'insert_size':              ['insert_size'],
+            'adapter_cutting':          ['adapter_cutting'],
+            'read1_before_filtering':   ['read1_before_filtering'],
+            'read2_before_filtering':   ['read2_before_filtering'],
+            'read1_after_filtering':    ['read1_after_filtering'],
+            'read2_after_filtering':    ['read2_after_filtering'],
+            'command':                  ["command"]
         }
         report = hk.read_json_dict(path_to_report)
         data = {mri:hk.find_in_nested_dict(report, mri_map[mri]) for mri in mri_map}
-        with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_fastp_et.json', 'w+') as f: json.dump(data,f)
-            
+
+        #filter read_before/after_filtering data
+        tags = [
+            'total_reads',
+            'total_bases',
+            'q20_bases',
+            'q30_bases',
+            'total_cycles',
+            'quality_curves',
+            'content_curves'
+            ]
+        filters = ['read1_before_filtering', 'read2_before_filtering', 'read1_after_filtering', 'read2_after_filtering']
+        for mri in filters:
+            record = dict(zip(tags,[data[mri][tag] for tag in tags]))
+            data[mri] = record
+
+        #get sequencing mode string
+        seq_mode = f'paired end ({data["read1_before_filtering"]["total_cycles"]} cycles + {data["read2_before_filtering"]["total_cycles"]})'
+        data['sequencing_mode'] = seq_mode
+        data['fastp_version'] = Wrapper._fastp_version
+
+        with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_fastp_et.json', 'w+') as f: json.dump(data,f, indent=4)
+
+
     @staticmethod
     def parse_fqscreen(sample_id:str, path_to_report:str, target_organism:str='SarsCoV2') -> dict:
         '''Serializes report as python dictionary'''
@@ -118,18 +144,28 @@ class Wrapper():
         df.columns = new_header
         df = df[:-1]
         data = {df.index[i][0]:[df.index[i][4],df.index[i][5]] for i in range(1,len(df)) if df.index[i][0] == target_organism}
-        with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_fqscreen_et.json', 'w+') as f: json.dump(data,f)
+        data['fastq_screen_version'] = Wrapper._fastqc_version
+        with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_fqscreen_et.json', 'w+') as f: json.dump(data,f, indent=4)
+
 
     @staticmethod
     def parse_ivar(sample_id:str, path_to_report:str) -> dict:
         '''Serializes report as python dictionary'''
+        # try:
         df = pd.read_csv(path_to_report, sep='\r\n', engine='python')[19:-5].reset_index(drop=True)
-        new_header = df.iloc[0].values[0].split('\t')
-        df.columns=df.iloc[0].values
-        df[new_header] = df[df.columns[0]].str.split('\t', expand = True)
+        if 'Results:' not in df.iloc[0].values:
+            new_header = df.iloc[0].values[0].split('\t')
+            df.columns=df.iloc[0].values
+            df[new_header] = df[df.columns[0]].str.split('\t', expand = True)
+        else:
+            new_header = df.iloc[1].values[0].split('\t')
+            df.columns=df.iloc[1].values
+            df[new_header] = df[df.columns[0]].str.split('\t', expand = True)
         data = df[new_header][1:].set_index('Primer Name').to_dict()
-        with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_ivar_et.json', 'w+') as f: json.dump(data,f)
+        data['ivar_version'] = Wrapper._ivar_version
+        with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_ivar_et.json', 'w+') as f: json.dump(data,f, indent=4)
 
+                
     @staticmethod
     def parse_qualimap(sample_id:str, path_to_report_cov:str, path_to_report_qual:str) -> dict:
         '''Serializes report as python dictionary'''
@@ -138,7 +174,9 @@ class Wrapper():
         gen_mapq_hist = pd.read_csv(path_to_report_qual, sep='\t')
         gen_mapq_hist = {gen_mapq_hist.columns[0]: list(gen_mapq_hist[gen_mapq_hist.columns[0]]), gen_mapq_hist.columns[1]: list(gen_mapq_hist[gen_mapq_hist.columns[1]])}
         data = {**gen_cov_hist, **gen_mapq_hist}
-        with open(f'{os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(path_to_report_cov))))}/{sample_id}_qmap_et.json', 'w+') as f: json.dump(data,f)
+        data['qualimap_version'] = Wrapper._qualimap_version
+        with open(f'{os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(path_to_report_cov))))}/{sample_id}_qmap_et.json', 'w+') as f: json.dump(data,f, indent=4)
+
 
     @staticmethod
     def parse_samtools(sample_id:str, path_to_report:str) -> dict:
@@ -146,7 +184,8 @@ class Wrapper():
         with open(path_to_report, 'r+') as f:
             lines = f.readlines()
         data = {'reads_mapped':lines[4].strip().split(' ')[0]}
-        with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_samtools_et.json', 'w+') as f: json.dump(data,f)
+        data['samtools_version'] = Wrapper._samtools_version
+        with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_samtools_et.json', 'w+') as f: json.dump(data,f, indent=4)
 
 
     @staticmethod
