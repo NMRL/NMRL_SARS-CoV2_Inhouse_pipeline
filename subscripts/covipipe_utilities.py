@@ -83,9 +83,31 @@ class covipipe_housekeeper(hk):
             return f'{old_path} {new_path} FAILED\n'#return info about successful renaming
 
 
+    @staticmethod
+    def snakemake_to_dict(path_to_smk:str) -> dict:
+        '''Given a path to a snakefile, returns dictionary mapping each rule to the code defined in "run" or "shell" directives as defined in given snakefile.'''
+        with open(path_to_smk, 'r') as f:
+            contents = f.read()
+
+        names = re.findall(r'rule .*\:', contents)
+        idxes = [contents.index(r) for r in names]
+        rules = [contents[idx:idxes[i+1]] for i, idx in enumerate(idxes) if not idx == idxes[-1]]
+        templates = []
+        for k in rules:
+            if 'shell:' in k: 
+                templates.append(k[k.index('shell:'):].replace('shell:', '').strip())
+            else:
+                templates.append(k[k.index('run:'):].replace('run:', '').strip())
+
+        names = [s.replace(':','').replace('rule ', '') for s in re.findall(r'rule .*\:', contents)]
+        data = dict(zip(names, templates))
+        return data
+
+
 class Wrapper():
     '''Toolkit class to store wrapper methods for different tools'''
-
+    
+    _rule_dict = covipipe_housekeeper.snakemake_to_dict('./snakefiles/cov_assembly')
     _config_dict = hk.read_yaml("./config_files/yaml/config_modular.yaml")
     _fastp_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} fastp --version', stderr=sp.PIPE, shell=True).stderr.decode('utf-8').strip()
     _fastqc_version = sp.run(f'module load singularity && singularity run {_config_dict["multiqc_sif"]} fastq_screen --version 2> /dev/null', stdout=sp.PIPE, shell=True).stdout.decode('utf=8').strip()
@@ -145,13 +167,13 @@ class Wrapper():
         df = df[:-1]
         data = {df.index[i][0]:[df.index[i][4],df.index[i][5]] for i in range(1,len(df)) if df.index[i][0] == target_organism}
         data['fastq_screen_version'] = Wrapper._fastqc_version
+        data['command'] = Wrapper._rule_dict['fastq_screening'].split('\n')
         with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_fqscreen_et.json', 'w+') as f: json.dump(data,f, indent=4)
 
 
     @staticmethod
     def parse_ivar(sample_id:str, path_to_report:str) -> dict:
         '''Serializes report as python dictionary'''
-        # try:
         df = pd.read_csv(path_to_report, sep='\r\n', engine='python')[19:-5].reset_index(drop=True)
         if 'Results:' not in df.iloc[0].values:
             new_header = df.iloc[0].values[0].split('\t')
@@ -163,6 +185,7 @@ class Wrapper():
             df[new_header] = df[df.columns[0]].str.split('\t', expand = True)
         data = df[new_header][1:].set_index('Primer Name').to_dict()
         data['ivar_version'] = Wrapper._ivar_version
+        data['command'] = Wrapper._rule_dict['primer_trimming'].split('\n')
         with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_ivar_et.json', 'w+') as f: json.dump(data,f, indent=4)
 
                 
@@ -175,6 +198,7 @@ class Wrapper():
         gen_mapq_hist = {gen_mapq_hist.columns[0]: list(gen_mapq_hist[gen_mapq_hist.columns[0]]), gen_mapq_hist.columns[1]: list(gen_mapq_hist[gen_mapq_hist.columns[1]])}
         data = {**gen_cov_hist, **gen_mapq_hist}
         data['qualimap_version'] = Wrapper._qualimap_version
+        data['command'] = Wrapper._rule_dict['alignment_quality_control'].split('\n')
         with open(f'{os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(path_to_report_cov))))}/{sample_id}_qmap_et.json', 'w+') as f: json.dump(data,f, indent=4)
 
 
@@ -185,6 +209,7 @@ class Wrapper():
             lines = f.readlines()
         data = {'reads_mapped':lines[4].strip().split(' ')[0]}
         data['samtools_version'] = Wrapper._samtools_version
+        data['command'] = Wrapper._rule_dict['alignment_quality_control'].split('\n')
         with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_samtools_et.json', 'w+') as f: json.dump(data,f, indent=4)
 
 
