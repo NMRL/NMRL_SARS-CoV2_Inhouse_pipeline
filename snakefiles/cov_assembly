@@ -1,3 +1,4 @@
+# localrules: serialize_fastp, serialize_fqscreen, serialize_ivar, serialize_qualimap, get_json
 #define sample_id_pattern wildcard and accessing sample_sheet
 import pandas as pd, re, os
 sys.path.insert(0, config['subscript_path'])
@@ -57,7 +58,6 @@ rule quality_control: #ok
     # envmodules:
     #     'singularity'
     output:
-        temp(config['output_directory']+'{sample_id_pattern}_fastp_et.json'),
         read_1 = temp(config['work_dir']+'{sample_id_pattern}_quality_filtered_R1.fastq.gz'),
         read_2 = temp(config['work_dir']+'{sample_id_pattern}_quality_filtered_R2.fastq.gz'),
         fastp_report_html = config['output_directory']+'{sample_id_pattern}_fastp_report.html',
@@ -70,7 +70,15 @@ module load singularity
 singularity run {input.sif_file} fastp -y -p -h {output.fastp_report_html} -j {output.fastp_report_json} -i {input.read_1} -I {input.read_2} -o {output.read_1} -O {output.read_2} -l {config['fastp_length_filter']} -q {config['fastp_quality_filter']}
 """
         )
-        wp.parse_fastp(wildcards.sample_id_pattern, output.fastp_report_json)
+        
+
+rule serialize_fastp:
+    input:
+        fastp_report_json = config['output_directory']+'{sample_id_pattern}_fastp_report.json'
+    output:
+        config['output_directory']+'{sample_id_pattern}_fastp_et.json'
+    run:
+        wp.parse_fastp(wildcards.sample_id_pattern, input.fastp_report_json)  
 
 
 rule read_alignment: #ok
@@ -95,7 +103,6 @@ rule primer_trimming: #ok
     # envmodules:
     #     'singularity'
     output:
-        temp(config['output_directory']+'{sample_id_pattern}_ivar_et.json'),
         trimmed_bam = temp(config['output_directory']+'{sample_id_pattern}_trimmed.bam'),
         index_1 = temp(config['output_directory']+'{sample_id_pattern}_sorted.bam.bai'),
         sortrimmed_bam = temp(config['output_directory']+'{sample_id_pattern}_trimmed_sorted.bam'),
@@ -111,7 +118,15 @@ singularity run {input.sif_file} samtools sort -o {output.sortrimmed_bam} {outpu
 singularity run {input.sif_file} samtools index {output.sortrimmed_bam}
 """
         )
-        wp.parse_ivar(wildcards.sample_id_pattern, output.ivar_log)
+        
+
+rule serialize_ivar:
+    input:
+        ivar_log = config['output_directory']+'{sample_id_pattern}_ivar_log.txt'
+    output:
+        config['output_directory']+'{sample_id_pattern}_ivar_et.json'
+    run:
+        wp.parse_ivar(wildcards.sample_id_pattern, input.ivar_log)
 
 
 rule indel_realignment: #ok
@@ -153,13 +168,13 @@ rule indel_realignment: #ok
 
 rule alignment_quality_control: #ok
     input:
+        config['output_directory']+'{sample_id_pattern}_qualimap/'+'raw_data_qualimapReport/coverage_across_reference.txt',
+        config['output_directory']+'{sample_id_pattern}_qualimap/'+'raw_data_qualimapReport/mapping_quality_across_reference.txt',
         sif_file = config["fastq_sif"],
         qualimap_path = config["qualimap_sif_path"],
         sorted_raw_bam = config['output_directory']+'{sample_id_pattern}_sorted.bam',
-        realigned_bam = config['work_dir']+'{sample_id_pattern}_unsort_markd.bam'
+        realigned_bam = config['work_dir']+'{sample_id_pattern}_unsort_markd.bam',
     output:
-        temp(config['output_directory']+'{sample_id_pattern}_samtools_et.json'),
-        temp(config['output_directory']+'{sample_id_pattern}_qmap_et.json'),
         flagstat_report = config['output_directory']+'{sample_id_pattern}_mapped_report.txt',
         sequencing_depth = config['output_directory']+'{sample_id_pattern}_seq_depth.txt',
         sorted_realigned_bam = temp(config['output_directory']+'{sample_id_pattern}_markd.bam'),
@@ -176,15 +191,29 @@ singularity run {input.sif_file} samtools sort -o {output.sorted_realigned_bam} 
 singularity run {input.sif_file} samtools index {output.sorted_realigned_bam};
 singularity run {input.sif_file} samtools depth {output.sorted_realigned_bam} > {output.sequencing_depth};
 mkdir -p {config['output_directory']}{wildcards.sample_id_pattern}_qualimap;
-singularity run {input.qualimap_path} qualimap bamqc -bam {output.sorted_realigned_bam} -outdir {config[output_directory]}{wildcards.sample_id_pattern}_qualimap --java-mem-size={config['qualimap_memory_limit_gb']}G || echo WARNING: No reads mapped to the reference -- {output.sorted_realigned_bam}; touch {output.qualimap_report}
+singularity run {input.qualimap_path} qualimap bamqc -bam {output.sorted_realigned_bam} -outdir {config['output_directory']}{wildcards.sample_id_pattern}_qualimap --java-mem-size={config['qualimap_memory_limit_gb']}G || echo WARNING: No reads mapped to the reference -- {output.sorted_realigned_bam}; touch {output.qualimap_report}
 """
             )
+
+
+rule serialize_qualimap:
+    input:
+        ref_cov = config['output_directory']+'{sample_id_pattern}_qualimap/'+'raw_data_qualimapReport/coverage_across_reference.txt',
+        ref_qual = config['output_directory']+'{sample_id_pattern}_qualimap/'+'raw_data_qualimapReport/mapping_quality_across_reference.txt',
+        flagstat_report = config['output_directory']+'{sample_id_pattern}_mapped_report.txt'
+    output:
+        config['output_directory']+'{sample_id_pattern}_samtools_et.json',
+        config['output_directory']+'{sample_id_pattern}_qmap_et.json'
+    run:
         wp.parse_qualimap(
-            wildcards.sample_id_pattern, 
-            config['output_directory']+f'{wildcards.sample_id_pattern}_qualimap/'+'raw_data_qualimapReport/coverage_across_reference.txt', 
-            config['output_directory']+f'{wildcards.sample_id_pattern}_qualimap/'+'raw_data_qualimapReport/mapping_quality_across_reference.txt'
+            wildcards.sample_id_pattern,
+            input.ref_cov, 
+            input.ref_qual
             )
-        wp.parse_samtools(wildcards.sample_id_pattern, output.flagstat_report)
+        wp.parse_samtools(wildcards.sample_id_pattern, input.flagstat_report)
+
+
+
 
 rule variant_calling: #ok
     input:
@@ -234,12 +263,10 @@ rule fastq_screening: #ok
         read_1 = config['work_dir']+'{sample_id_pattern}_R1_001.fastq.gz',
         read_2 = config['work_dir']+'{sample_id_pattern}_R2_001.fastq.gz'
     output:
-        temp(config["output_directory"]+"{sample_id_pattern}_fqscreen_et.json"),
         read_1_profile_txt = config["output_directory"]+"{sample_id_pattern}_1_screen.txt",
         read_1_profile_html = config["output_directory"]+"{sample_id_pattern}_1_screen.html",
         read_2_profile_txt = config["output_directory"]+"{sample_id_pattern}_2_screen.txt",
         read_2_profile_html = config["output_directory"]+"{sample_id_pattern}_2_screen.html"
-
     # envmodules:
     #     'singularity'
     run:
@@ -257,9 +284,20 @@ mv {config['output_directory']}{wildcards.sample_id_pattern}_*R2*_screen.txt {ou
 mv {config['output_directory']}{wildcards.sample_id_pattern}_*R2*_screen.html {output.read_2_profile_html}
 """
         )
-        wp.parse_fqscreen(wildcards.sample_id_pattern, output.read_1_profile_txt)
-        wp.parse_fqscreen(wildcards.sample_id_pattern, output.read_2_profile_txt)
-        
+
+
+
+rule serialize_fqscreen:
+    input:
+        read_1_profile_txt = config["output_directory"]+"{sample_id_pattern}_1_screen.txt",
+        read_2_profile_txt = config["output_directory"]+"{sample_id_pattern}_2_screen.txt"
+    output:
+        config["output_directory"]+"{sample_id_pattern}_fqscreen_et.json"
+    run:
+        wp.parse_fqscreen(wildcards.sample_id_pattern, input.read_1_profile_txt)
+        wp.parse_fqscreen(wildcards.sample_id_pattern, input.read_2_profile_txt)
+
+
 
 rule vcf_to_csv: #ok
     input:
