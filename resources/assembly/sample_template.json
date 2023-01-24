@@ -1,0 +1,33 @@
+{
+    "header": {
+        "covid_analysis_json_summary_version": 0.1
+    },
+    "metadata": {},
+    "data": {
+        "pipelines": {
+            "inhouse-covidpipe": {
+                "qc": {
+                    "cutadapt": {},
+                    "fastp": {},
+                    "qualimap": {}
+                },
+                "taxonomy": {
+                    "fastqscreen": {}
+                },
+                "assembly": {
+                    "ivar": {},
+                    "bwa-mem": {},
+                    "picard": {},
+                    "abra": {},
+                    "samtools": {}
+                },
+                "annotation": {
+                    "snpEff": {}
+                },
+                "typing": {
+                    "freebayes": {}
+                }
+            }
+        }
+    }
+}
