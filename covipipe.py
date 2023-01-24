@@ -20,4 +20,4 @@ if __name__ == "__main__":
         run_downstream(args)
     elif args.mode == 'log_analysis':
         hk.update_log_history(pipeline_name='covipipe')
-        hk.update_log_summary(notebook_path='./subscripts/downstream/log_summary.ipynb', env_path='./tools/rbase_env/', output_dir='./')
+        hk.update_log_summary(notebook_path='./subscripts/downstream/log_summary.ipynb', env_path='/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/rbase_env', output_dir='./')

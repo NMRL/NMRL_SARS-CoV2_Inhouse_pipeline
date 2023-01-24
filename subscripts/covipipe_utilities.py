@@ -109,6 +109,7 @@ class Wrapper():
     
     _rule_dict = covipipe_housekeeper.snakemake_to_dict('./snakefiles/cov_assembly')
     _config_dict = hk.read_yaml("./config_files/yaml/config_modular.yaml")
+    _cutadapt_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} cutadapt --version', stdout=sp.PIPE, shell=True).stdout.decode('utf-8').strip()
     _fastp_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} fastp --version', stderr=sp.PIPE, shell=True).stderr.decode('utf-8').strip()
     _fastqc_version = sp.run(f'module load singularity && singularity run {_config_dict["multiqc_sif"]} fastq_screen --version 2> /dev/null', stdout=sp.PIPE, shell=True).stdout.decode('utf=8').strip()
     _ivar_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} ivar -v 2> /dev/null', stdout=sp.PIPE, shell=True).stdout.decode('utf=8').split('\n')[0]
@@ -173,7 +174,7 @@ class Wrapper():
         data = {df.index[i][0]:[df.index[i][4],df.index[i][5]] for i in range(1,len(df)) if df.index[i][0] == target_organism}
         data['fastq_screen_version'] = Wrapper._fastqc_version
         data['command'] = Wrapper._rule_dict['fastq_screening'].split('\n')
-        with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_fqscreen_et.json', 'w+') as f: json.dump(data,f, indent=4)
+        with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_fastqscreen_et.json', 'w+') as f: json.dump(data,f, indent=4)
 
 
     @staticmethod
@@ -204,7 +205,7 @@ class Wrapper():
         data = {**gen_cov_hist, **gen_mapq_hist}
         data['qualimap_version'] = Wrapper._qualimap_version
         data['command'] = Wrapper._rule_dict['alignment_quality_control'].split('\n')
-        with open(f'{os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(path_to_report_cov))))}/{sample_id}_qmap_et.json', 'w+') as f: json.dump(data,f, indent=4)
+        with open(f'{os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(path_to_report_cov))))}/{sample_id}_qualimap_et.json', 'w+') as f: json.dump(data,f, indent=4)
 
 
     @staticmethod
@@ -220,12 +221,14 @@ class Wrapper():
 
     @staticmethod
     def combine_jsons(sample_id:str, output_path:str, report_paths:list) -> None:
-        data = {}
-        for path in report_paths:
-            with open(path, 'r+') as f:
-                data[os.path.basename(path)] = json.load(f)
-        
-        with open(f'{output_path}{sample_id}_combined.json', 'w+') as f:
-            json.dump(data,f, indent=4)
+        _template_path = './resources/assembly/sample_template.json'
+        _template = hk.read_json_dict(_template_path)
+        data = {os.path.basename(path).replace(f'{sample_id}_', '').replace('_et.json', ''):hk.read_json_dict(path) for path in report_paths}
+
+        #Populate the template
+        for key in data:
+            print(key, hk.edit_nested_dict(_template['inhouse-covidpipe'], key, data[key]))
+
+        hk.write_json(_template, f'{output_path}/{sample_id}_combined_tempate_test.json')
         
         
