@@ -1,4 +1,4 @@
-import re, os, pandas as pd, concurrent.futures, subprocess, sys, json
+import re, os, pandas as pd, concurrent.futures, subprocess, sys
 from turtle import down
 from datetime import datetime
 from subscripts.covipipe_utilities import covipipe_housekeeper as hk
@@ -27,6 +27,15 @@ class Covid_assembly(Module):
         self.backward_result_file_map = {} #to map file restored annotated paths to specific annotated path
         self.renamed_fastq_file_map = {} #to store original and illumina-formatted fastq file name
         self.backward_fastq_file_map = {} #storing reversed renamed_fastq_file_map to restore original fastq file names after processing
+
+
+    def clear_working_directory(self):
+        '''Overwriting base class cleanup method to include pipeline-specific cleanup functionality'''
+        super(Covid_assembly, self).clear_working_directory()
+        #remove temp files from output
+        #remove temp files from temp
+        #move input from temp to input
+
 
     def fill_input_dict(self, check_integrity:bool=False): #extends Module class
         '''
