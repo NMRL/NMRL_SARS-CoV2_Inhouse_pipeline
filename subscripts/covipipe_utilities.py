@@ -225,10 +225,21 @@ class Wrapper():
         _template = hk.read_json_dict(_template_path)
         data = {os.path.basename(path).replace(f'{sample_id}_', '').replace('_et.json', ''):hk.read_json_dict(path) for path in report_paths}
 
-        #Populate the template
-        for key in data:
-            print(key, hk.edit_nested_dict(_template['inhouse-covidpipe'], key, data[key]))
+        #Add versions for all tools not expicitely serialized
+        tool_dict = {
+            'cutadapt':[Wrapper._rule_dict['adapter_removal'].split('\n'),Wrapper._cutadapt_version],
+            'bwa-mem':[Wrapper._rule_dict['read_alignment'].split('\n'),Wrapper._bwamem_version],
+            'picard':[Wrapper._rule_dict['indel_realignment'].split('\n'),Wrapper._picard_version],
+            'abra':[Wrapper._rule_dict['indel_realignment'].split('\n'),Wrapper._abra_version],
+            'snpEff':[Wrapper._rule_dict['variant_annotation'].split('\n'),Wrapper._snpeff_version],
+            'freebayes':[Wrapper._rule_dict['variant_calling'].split('\n'),Wrapper._freebayes_version]
+        }
+        for tool in tool_dict: data[tool] = {f'{tool}_version':tool_dict[tool][1], 'command':tool_dict[tool][0]}
 
-        hk.write_json(_template, f'{output_path}/{sample_id}_combined_tempate_test.json')
+
+        #Populate the template
+        for key in data: hk.edit_nested_dict(_template['data']['pipelines']['inhouse-covidpipe'], key, data[key])
+
+        hk.write_json(_template, f'{output_path}/{sample_id}_combined_template.json')
         
         
