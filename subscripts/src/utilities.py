@@ -119,11 +119,22 @@ class Housekeeper:
         """
         if param in config_dict:
             config_dict[param] = new_value
-            return 0 #this return is reached if key was found and value was changed
-        else:
-            for value in config_dict.values():
-                if isinstance(value, dict):
-                    return Housekeeper.edit_nested_dict(value, param, new_value)
+            return 0
+        for k in config_dict:
+            if isinstance(config_dict[k], dict):
+                if param in config_dict[k]:
+                    config_dict[k][param] = new_value
+                    return 0 #this return is reached if key was found and value was changed
+                else:
+                    for value in config_dict[k].values():
+                        if isinstance(value, dict):
+                            if param in value:
+                                value[param] = new_value
+                                return 0 #this return is reached if key was found and value was changed
+                            result = Housekeeper.edit_nested_dict(value, param, new_value)
+                            if result is None:
+                                break
+
 
     @staticmethod
     def find_in_nested_dict(nested_dict:dict, key_sequence:list):
@@ -206,12 +217,12 @@ class Housekeeper:
             yaml.dump(input_dict,yaml_handle)
 
     @staticmethod
-    def write_json(input_dict:dict, json_path:str):
+    def write_json(input_dict:dict, json_path:str, indent:int=4) -> None:
         """
         Given a dictionary (dict) and a path to the json file (str) writes the contents to file.
         """
         with open(json_path, "w+") as json_handle:
-            json.dump(input_dict,json_handle)
+            json.dump(input_dict,json_handle, indent=indent)
 
 
     @staticmethod
