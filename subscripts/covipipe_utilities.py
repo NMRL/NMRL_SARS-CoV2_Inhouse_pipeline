@@ -113,12 +113,12 @@ class Wrapper():
     _fastp_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} fastp --version', stderr=sp.PIPE, shell=True).stderr.decode('utf-8').strip()
     _fastqc_version = sp.run(f'module load singularity && singularity run {_config_dict["multiqc_sif"]} fastq_screen --version 2> /dev/null', stdout=sp.PIPE, shell=True).stdout.decode('utf=8').strip()
     _ivar_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} ivar -v 2> /dev/null', stdout=sp.PIPE, shell=True).stdout.decode('utf=8').split('\n')[0]
-    _qualimap_version = sp.run(f'module load singularity && singularity run {_config_dict["qualimap_sif_path"]} qualimap bamqc --version 2> /dev/null', stdout=sp.PIPE, shell=True).stdout.decode('utf-8').split('\n')[3]
+    _qualimap_version = sp.run(f'module load singularity && singularity run {_config_dict["qualimap"]["qualimap_sif_path"]} qualimap bamqc --version 2> /dev/null', stdout=sp.PIPE, shell=True).stdout.decode('utf-8').split('\n')[3]
     _samtools_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} samtools --version 2> /dev/null', stdout=sp.PIPE, shell=True).stdout.decode('utf=8').split('\n')[0]
     _bwamem_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} bwa ', stderr=sp.PIPE, shell=True).stderr.decode('utf=8').split('\n')[2]
-    _picard_version = sp.run(f'java -jar {_config_dict["picard_jar_path"]} MarkDuplicates --version', stderr=sp.PIPE, shell=True).stderr.decode('utf-8').strip()
-    _abra_version = sp.run(f'java -jar {_config_dict["abra_jar_path"]} --version', stderr=sp.PIPE, shell=True).stderr.decode('utf-8').strip().split('\t')[2].split('\n')[0]
-    _snpeff_version = sp.run(f'java -jar {_config_dict["snpEff_path"]} -version', stdout=sp.PIPE, shell=True).stdout.decode('utf-8').strip().replace('\t',' ')
+    _picard_version = sp.run(f'java -jar {_config_dict["picard"]["picard_jar_path"]} MarkDuplicates --version', stderr=sp.PIPE, shell=True).stderr.decode('utf-8').strip()
+    _abra_version = sp.run(f'java -jar {_config_dict["abra"]["abra_jar_path"]} --version', stderr=sp.PIPE, shell=True).stderr.decode('utf-8').strip().split('\t')[2].split('\n')[0]
+    _snpeff_version = sp.run(f'java -jar {_config_dict["snpEff"]["snpEff_path"]} -version', stdout=sp.PIPE, shell=True).stdout.decode('utf-8').strip().replace('\t',' ')
     _freebayes_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} freebayes --version ', stdout=sp.PIPE, shell=True).stdout.decode('utf=8').strip()
     
 
@@ -160,7 +160,7 @@ class Wrapper():
         seq_mode = f'paired end ({data["read1_before_filtering"]["total_cycles"]} cycles + {data["read2_before_filtering"]["total_cycles"]})'
         data['sequencing_mode'] = seq_mode
         data['fastp_version'] = Wrapper._fastp_version
-
+        data['options'] = Wrapper._config_dict['fastp']
         with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_fastp_et.json', 'w+') as f: json.dump(data,f, indent=4)
 
 
@@ -174,6 +174,7 @@ class Wrapper():
         data = {df.index[i][0]:[df.index[i][4],df.index[i][5]] for i in range(1,len(df)) if df.index[i][0] == target_organism}
         data['fastq_screen_version'] = Wrapper._fastqc_version
         data['command'] = Wrapper._rule_dict['fastq_screening'].split('\n')
+        data['options'] = Wrapper._config_dict['fastqscreen']
         with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_fastqscreen_et.json', 'w+') as f: json.dump(data,f, indent=4)
 
 
@@ -192,6 +193,7 @@ class Wrapper():
         data = df[new_header][1:].set_index('Primer Name').to_dict()
         data['ivar_version'] = Wrapper._ivar_version
         data['command'] = Wrapper._rule_dict['primer_trimming'].split('\n')
+        data['options'] = Wrapper._config_dict['ivar']
         with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_ivar_et.json', 'w+') as f: json.dump(data,f, indent=4)
 
                 
@@ -205,6 +207,7 @@ class Wrapper():
         data = {**gen_cov_hist, **gen_mapq_hist}
         data['qualimap_version'] = Wrapper._qualimap_version
         data['command'] = Wrapper._rule_dict['alignment_quality_control'].split('\n')
+        data['options'] = Wrapper._config_dict['qualimap']
         with open(f'{os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(path_to_report_cov))))}/{sample_id}_qualimap_et.json', 'w+') as f: json.dump(data,f, indent=4)
 
 
@@ -221,25 +224,25 @@ class Wrapper():
 
     @staticmethod
     def combine_jsons(sample_id:str, output_path:str, report_paths:list) -> None:
-        _template_path = './resources/assembly/sample_template.json'
+        _template_path = Wrapper._config_dict['sample_template']
         _template = hk.read_json_dict(_template_path)
         data = {os.path.basename(path).replace(f'{sample_id}_', '').replace('_et.json', ''):hk.read_json_dict(path) for path in report_paths}
 
-        #Add versions for all tools not expicitely serialized
+        #Add versions for all tools not explicitly serialized
         tool_dict = {
-            'cutadapt':[Wrapper._rule_dict['adapter_removal'].split('\n'),Wrapper._cutadapt_version],
-            'bwa-mem':[Wrapper._rule_dict['read_alignment'].split('\n'),Wrapper._bwamem_version],
-            'picard':[Wrapper._rule_dict['indel_realignment'].split('\n'),Wrapper._picard_version],
-            'abra':[Wrapper._rule_dict['indel_realignment'].split('\n'),Wrapper._abra_version],
-            'snpEff':[Wrapper._rule_dict['variant_annotation'].split('\n'),Wrapper._snpeff_version],
-            'freebayes':[Wrapper._rule_dict['variant_calling'].split('\n'),Wrapper._freebayes_version]
+            'cutadapt':[Wrapper._rule_dict['adapter_removal'].split('\n'), Wrapper._cutadapt_version, Wrapper._config_dict['cutadapt']],
+            'bwa-mem':[Wrapper._rule_dict['read_alignment'].split('\n'), Wrapper._bwamem_version, Wrapper._config_dict['bwa-mem']],
+            'picard':[Wrapper._rule_dict['indel_realignment'].split('\n'), Wrapper._picard_version, Wrapper._config_dict['picard']],
+            'abra':[Wrapper._rule_dict['indel_realignment'].split('\n'), Wrapper._abra_version, Wrapper._config_dict['abra']],
+            'snpEff':[Wrapper._rule_dict['variant_annotation'].split('\n'), Wrapper._snpeff_version, Wrapper._config_dict['snpEff']],
+            'freebayes':[Wrapper._rule_dict['variant_calling'].split('\n'), Wrapper._freebayes_version, Wrapper._config_dict['freebayes']]
         }
-        for tool in tool_dict: data[tool] = {f'{tool}_version':tool_dict[tool][1], 'command':tool_dict[tool][0]}
+        for tool in tool_dict: data[tool] = {f'{tool}_version':tool_dict[tool][1], 'command':tool_dict[tool][0], 'options':tool_dict[tool][2]}
 
 
         #Populate the template
         for key in data: hk.edit_nested_dict(_template['data']['pipelines']['inhouse-covidpipe'], key, data[key])
 
-        hk.write_json(_template, f'{output_path}/{sample_id}_combined_template.json')
+        hk.write_json(_template, f'{output_path}/{sample_id}_combined.json')
         
         
