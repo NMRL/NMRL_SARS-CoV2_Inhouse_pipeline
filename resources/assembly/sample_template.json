@@ -25,7 +25,8 @@
                     "snpEff": {}
                 },
                 "typing": {
-                    "freebayes": {}
+                    "freebayes": {},
+                    "pangolin": {}
                 }
             }
         }
