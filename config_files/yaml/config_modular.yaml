@@ -94,6 +94,10 @@ fastqscreen:
 multiqc:
   multiqc_threads: 12
 
+pangolin:
+  sif_path: /mnt/home/groups/nmrl/image_files/pangolin.sif
+  threads: 20
+
 ###Filled by the wrapper
 assembly_target_files:
 output_directory:
