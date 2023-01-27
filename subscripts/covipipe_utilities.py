@@ -1,5 +1,5 @@
 
-import pandas as pd, gzip, re, os, json, sys, subprocess as sp
+import pandas as pd, gzip, re, os, sys, subprocess as sp
 from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(Path(__file__).absolute())))
 from subscripts.src.utilities import Housekeeper as hk
@@ -120,10 +120,11 @@ class Wrapper():
     _abra_version = sp.run(f'java -jar {_config_dict["abra"]["abra_jar_path"]} --version', stderr=sp.PIPE, shell=True).stderr.decode('utf-8').strip().split('\t')[2].split('\n')[0]
     _snpeff_version = sp.run(f'java -jar {_config_dict["snpEff"]["snpEff_path"]} -version', stdout=sp.PIPE, shell=True).stdout.decode('utf-8').strip().replace('\t',' ')
     _freebayes_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} freebayes --version ', stdout=sp.PIPE, shell=True).stdout.decode('utf=8').strip()
-    
+    _pangolin_version = sp.run(f'module load singularity && singularity run {_config_dict["pangolin"]["sif_path"]} pangolin --version', stdout=sp.PIPE, shell=True).stdout.decode('utf-8').strip()
+
 
     @staticmethod
-    def parse_fastp(sample_id:str, path_to_report:str) -> dict:
+    def parse_fastp(sample_id:str, path_to_report:str) -> None:
         '''Serializes report as python dictionary'''
         mri_map = {
             'before_filtering':         ['summary','before_filtering'],
@@ -161,11 +162,11 @@ class Wrapper():
         data['sequencing_mode'] = seq_mode
         data['fastp_version'] = Wrapper._fastp_version
         data['options'] = Wrapper._config_dict['fastp']
-        with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_fastp_et.json', 'w+') as f: json.dump(data,f, indent=4)
+        hk.write_json(data, f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_fastp_et.json', indent=4)
 
 
     @staticmethod
-    def parse_fqscreen(sample_id:str, path_to_report:str, target_organism:str='SarsCoV2') -> dict:
+    def parse_fqscreen(sample_id:str, path_to_report:str, target_organism:str='SarsCoV2') -> None:
         '''Serializes report as python dictionary'''
         df = pd.read_csv(path_to_report, sep='\t')
         new_header = df.iloc[0]
@@ -175,11 +176,11 @@ class Wrapper():
         data['fastq_screen_version'] = Wrapper._fastqc_version
         data['command'] = Wrapper._rule_dict['fastq_screening'].split('\n')
         data['options'] = Wrapper._config_dict['fastqscreen']
-        with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_fastqscreen_et.json', 'w+') as f: json.dump(data,f, indent=4)
+        hk.write_json(data, f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_fastqscreen_et.json', indent=4)
 
 
     @staticmethod
-    def parse_ivar(sample_id:str, path_to_report:str) -> dict:
+    def parse_ivar(sample_id:str, path_to_report:str) -> None:
         '''Serializes report as python dictionary'''
         df = pd.read_csv(path_to_report, sep='\r\n', engine='python')[19:-5].reset_index(drop=True)
         if 'Results:' not in df.iloc[0].values:
@@ -194,11 +195,11 @@ class Wrapper():
         data['ivar_version'] = Wrapper._ivar_version
         data['command'] = Wrapper._rule_dict['primer_trimming'].split('\n')
         data['options'] = Wrapper._config_dict['ivar']
-        with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_ivar_et.json', 'w+') as f: json.dump(data,f, indent=4)
+        hk.write_json(data, f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_ivar_et.json', indent=4)
 
                 
     @staticmethod
-    def parse_qualimap(sample_id:str, path_to_report_cov:str, path_to_report_qual:str) -> dict:
+    def parse_qualimap(sample_id:str, path_to_report_cov:str, path_to_report_qual:str) -> None:
         '''Serializes report as python dictionary'''
         gen_cov_hist = pd.read_csv(path_to_report_cov, sep='\t')
         gen_cov_hist = {gen_cov_hist.columns[0]: list(gen_cov_hist[gen_cov_hist.columns[0]]), gen_cov_hist.columns[1]: list(gen_cov_hist[gen_cov_hist.columns[1]])}
@@ -208,18 +209,32 @@ class Wrapper():
         data['qualimap_version'] = Wrapper._qualimap_version
         data['command'] = Wrapper._rule_dict['alignment_quality_control'].split('\n')
         data['options'] = Wrapper._config_dict['qualimap']
-        with open(f'{os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(path_to_report_cov))))}/{sample_id}_qualimap_et.json', 'w+') as f: json.dump(data,f, indent=4)
+        hk.write_json(data, f'{os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(path_to_report_cov))))}/{sample_id}_qualimap_et.json', indent=4)
 
 
     @staticmethod
-    def parse_samtools(sample_id:str, path_to_report:str) -> dict:
+    def parse_samtools(sample_id:str, path_to_report:str) -> None:
         '''Serializes report as python dictionary'''
         with open(path_to_report, 'r+') as f:
             lines = f.readlines()
         data = {'reads_mapped':lines[4].strip().split(' ')[0]}
         data['samtools_version'] = Wrapper._samtools_version
         data['command'] = Wrapper._rule_dict['alignment_quality_control'].split('\n')
-        with open(f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_samtools_et.json', 'w+') as f: json.dump(data,f, indent=4)
+        hk.write_json(data, f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_samtools_et.json', indent=4)
+
+
+    @staticmethod
+    def parse_pangolin(sample_id:str, path_to_report:str) -> None:
+        report = pd.read_csv(path_to_report)
+        data = {
+            "lineage":      report['lineage'].values[0], 
+            "qc_status":    report['qc_status'].values[0], 
+            "qc_notes":     report['qc_notes'].values[0]
+            }
+        data['pangolin_version'] = Wrapper._pangolin_version
+        data['command'] = Wrapper._rule_dict['pangolin']
+        data['options'] = Wrapper._config_dict['pangolin']
+        hk.write_json(data, f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_pangolin_et.json', indent=4)
 
 
     @staticmethod
