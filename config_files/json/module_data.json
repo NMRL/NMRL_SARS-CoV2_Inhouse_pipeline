@@ -21,7 +21,8 @@
             "_sorted.bam",
             ".ann.csv",
             ".vcf",
-            "_combined.json"
+            "_combined.json",
+            "_lineage_report.csv"
         ],
         "patterns": {
             "inputs": [
