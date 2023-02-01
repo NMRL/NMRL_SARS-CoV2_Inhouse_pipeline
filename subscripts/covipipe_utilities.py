@@ -15,7 +15,7 @@ class covipipe_housekeeper(hk):
         '''
         df['temp_col'] = df[column_to_map].map(new_dict) #adding numbered sample ids to the sample sheet to be used by downstream module
         del df[column_to_replace] #removing old sample ids
-        df.rename(columns={'temp_col':column_to_replace}, inplace=True) #adding new sample ids
+        df.rename(columns = {'temp_col':column_to_replace}, inplace=True) #adding new sample ids
         return df
 
     
@@ -106,26 +106,66 @@ class covipipe_housekeeper(hk):
 
 class Wrapper():
     '''Toolkit class to store wrapper methods for different tools'''
-    
-    _rule_dict = covipipe_housekeeper.snakemake_to_dict('./snakefiles/cov_assembly')
-    _config_dict = hk.read_yaml("./config_files/yaml/config_modular.yaml")
-    _cutadapt_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} cutadapt --version', stdout=sp.PIPE, shell=True).stdout.decode('utf-8').strip()
-    _fastp_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} fastp --version', stderr=sp.PIPE, shell=True).stderr.decode('utf-8').strip()
-    _fastqc_version = sp.run(f'module load singularity && singularity run {_config_dict["multiqc_sif"]} fastq_screen --version 2> /dev/null', stdout=sp.PIPE, shell=True).stdout.decode('utf=8').strip()
-    _ivar_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} ivar -v 2> /dev/null', stdout=sp.PIPE, shell=True).stdout.decode('utf=8').split('\n')[0]
-    _qualimap_version = sp.run(f'module load singularity && singularity run {_config_dict["qualimap"]["qualimap_sif_path"]} qualimap bamqc --version 2> /dev/null', stdout=sp.PIPE, shell=True).stdout.decode('utf-8').split('\n')[3]
-    _samtools_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} samtools --version 2> /dev/null', stdout=sp.PIPE, shell=True).stdout.decode('utf=8').split('\n')[0]
-    _bwamem_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} bwa ', stderr=sp.PIPE, shell=True).stderr.decode('utf=8').split('\n')[2]
-    _picard_version = sp.run(f'java -jar {_config_dict["picard"]["picard_jar_path"]} MarkDuplicates --version', stderr=sp.PIPE, shell=True).stderr.decode('utf-8').strip()
-    _abra_version = sp.run(f'java -jar {_config_dict["abra"]["abra_jar_path"]} --version', stderr=sp.PIPE, shell=True).stderr.decode('utf-8').strip().split('\t')[2].split('\n')[0]
-    _snpeff_version = sp.run(f'java -jar {_config_dict["snpEff"]["snpEff_path"]} -version', stdout=sp.PIPE, shell=True).stdout.decode('utf-8').strip().replace('\t',' ')
-    _freebayes_version = sp.run(f'module load singularity && singularity run {_config_dict["fastq_sif"]} freebayes --version ', stdout=sp.PIPE, shell=True).stdout.decode('utf=8').strip()
-    _pangolin_version = sp.run(f'module load singularity && singularity run {_config_dict["pangolin"]["sif_path"]} pangolin --version', stdout=sp.PIPE, shell=True).stdout.decode('utf-8').strip()
 
+    #pipeline configuration saved at module import
+    _rule_dict      = covipipe_housekeeper.snakemake_to_dict('./snakefiles/cov_assembly')
+    _config_dict    = hk.read_yaml("./config_files/yaml/config_modular.yaml")
+    
+    #tool versions saved at module import
+    _bwamem_version = sp.run(
+        f'module load singularity && singularity run {_config_dict["fastq_sif"]} bwa ',
+        stderr=sp.PIPE, shell=True).stderr.decode('utf=8').split('\n')[2]
+    
+    _fastp_version  = sp.run(
+        f'module load singularity && singularity run {_config_dict["fastq_sif"]} fastp --version',
+        stderr=sp.PIPE, shell=True).stderr.decode('utf-8').strip()
+    
+    _picard_version = sp.run(
+        f'java -jar {_config_dict["picard"]["picard_jar_path"]} MarkDuplicates --version',
+        stderr=sp.PIPE, shell=True).stderr.decode('utf-8').strip()
+    
+    _abra_version   = sp.run(
+        f'java -jar {_config_dict["abra"]["abra_jar_path"]} --version',
+        stderr=sp.PIPE, shell=True).stderr.decode('utf-8').strip().split('\t')[2].split('\n')[0]
+
+    _cutadapt_version  = sp.run(
+        f'module load singularity && singularity run {_config_dict["fastq_sif"]} cutadapt --version',
+        stdout=sp.PIPE, shell=True).stdout.decode('utf-8').strip()
+    
+    _fastqc_version    = sp.run(
+        f'module load singularity && singularity run {_config_dict["multiqc_sif"]} fastq_screen --version 2> /dev/null',
+        stdout=sp.PIPE, shell=True).stdout.decode('utf=8').strip()
+    
+    _ivar_version      = sp.run(
+        f'module load singularity && singularity run {_config_dict["fastq_sif"]} ivar -v 2> /dev/null',
+        stdout=sp.PIPE, shell=True).stdout.decode('utf=8').split('\n')[0]
+    
+    _qualimap_version  = sp.run(
+        f'module load singularity && singularity run {_config_dict["qualimap"]["qualimap_sif_path"]} qualimap bamqc --version 2> /dev/null',
+        stdout=sp.PIPE, shell=True).stdout.decode('utf-8').split('\n')[3]
+    
+    _samtools_version  = sp.run(
+        f'module load singularity && singularity run {_config_dict["fastq_sif"]} samtools --version 2> /dev/null',
+        stdout=sp.PIPE, shell=True).stdout.decode('utf=8').split('\n')[0]
+    
+    _freebayes_version = sp.run(
+        f'module load singularity && singularity run {_config_dict["fastq_sif"]} freebayes --version ',
+        stdout=sp.PIPE, shell=True).stdout.decode('utf=8').strip()
+    
+    _pangolin_version  = sp.run(
+        f'module load singularity && singularity run {_config_dict["pangolin"]["sif_path"]} pangolin --version',
+        stdout=sp.PIPE, shell=True).stdout.decode('utf-8').strip()
+    
+    _snpeff_version    = sp.run(
+        f'java -jar {_config_dict["snpEff"]["snpEff_path"]} -version',
+        stdout=sp.PIPE, shell=True).stdout.decode('utf-8').strip().replace('\t',' ')
+    
 
     @staticmethod
     def parse_fastp(sample_id:str, path_to_report:str) -> None:
-        '''Serializes report as python dictionary'''
+        '''Serializes report as json file'''
+        
+        #Defining paths to required fastp MRIs
         mri_map = {
             'before_filtering':         ['summary','before_filtering'],
             'after_filtering':          ['summary', 'after_filtering'],
@@ -139,10 +179,11 @@ class Wrapper():
             'read2_after_filtering':    ['read2_after_filtering'],
             'command':                  ["command"]
         }
-        report = hk.read_json_dict(path_to_report)
-        data = {mri:hk.find_in_nested_dict(report, mri_map[mri]) for mri in mri_map}
 
-        #filter read_before/after_filtering data
+        #extracting MRIs from fastp report
+        report = hk.read_json_dict(path_to_report)
+        data   = {mri:hk.find_in_nested_dict(report, mri_map[mri]) for mri in mri_map} 
+
         tags = [
             'total_reads',
             'total_bases',
@@ -152,112 +193,218 @@ class Wrapper():
             'quality_curves',
             'content_curves'
             ]
-        filters = ['read1_before_filtering', 'read2_before_filtering', 'read1_after_filtering', 'read2_after_filtering']
+        filters = [
+            'read1_before_filtering', 
+            'read2_before_filtering', 
+            'read1_after_filtering', 
+            'read2_after_filtering'
+            ]
+        
+        #keeping only subfields defined in tags
         for mri in filters:
-            record = dict(zip(tags,[data[mri][tag] for tag in tags]))
+            record    = dict(zip(tags,[data[mri][tag] for tag in tags]))
             data[mri] = record
 
-        #get sequencing mode string
-        seq_mode = f'paired end ({data["read1_before_filtering"]["total_cycles"]} cycles + {data["read2_before_filtering"]["total_cycles"]})'
+        #generating sequencing mode string based on real cycles
+        forward_cycles          = data["read1_before_filtering"]["total_cycles"]
+        reverse_cycles          = data["read2_before_filtering"]["total_cycles"]
+        seq_mode                = f'paired end ({forward_cycles} cycles + {reverse_cycles})'
+
         data['sequencing_mode'] = seq_mode
-        data['fastp_version'] = Wrapper._fastp_version
-        data['options'] = Wrapper._config_dict['fastp']
-        hk.write_json(data, f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_fastp_et.json', indent=4)
+        data['fastp_version']   = Wrapper._fastp_version
+        data['options']         = Wrapper._config_dict['fastp']
+    
+        output_folder           = os.path.abspath(os.path.dirname(path_to_report))
+        outpath                 = f'{output_folder}/{sample_id}_fastp_et.json'
+        hk.write_json(data, outpath, indent=4)
 
 
     @staticmethod
-    def parse_fqscreen(sample_id:str, path_to_report:str, target_organism:str='SarsCoV2') -> None:
-        '''Serializes report as python dictionary'''
-        df = pd.read_csv(path_to_report, sep='\t')
-        new_header = df.iloc[0]
-        df.columns = new_header
-        df = df[:-1]
-        data = {df.index[i][0]:[df.index[i][4],df.index[i][5]] for i in range(1,len(df)) if df.index[i][0] == target_organism}
-        data['fastq_screen_version'] = Wrapper._fastqc_version
-        data['command'] = Wrapper._rule_dict['fastq_screening'].split('\n')
-        data['options'] = Wrapper._config_dict['fastqscreen']
-        hk.write_json(data, f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_fastqscreen_et.json', indent=4)
+    def parse_fqscreen(sample_id:str, path_to_report:str, target_organism:str='SarsCoV2', contaminants:list=['Human', 'Ecoli', 'Adapters', 'PhiX']) -> None:
+        '''Serializes report as json file'''
+        with open(path_to_report, 'r+') as f: d = f.read()
+
+        df          = pd.DataFrame([l.split('\t') for l in d.split('\n') if len(l.split('\t')) == 12])      #fastqscreen contains 12 informative columns
+        new_header  = df.iloc[0]
+        df.columns  = new_header
+        df          = df[1:]                                                                                #removing row with column names
+        df.index    = df.Genome                                                                             #allows to search by organism
+        df          = df[df.columns[1:]]                                                                    #removing column used as index
+
+        #assuming single target + optionally tracked contaminants
+        data = {
+            target_organism:{
+                    'Reads_processed':           df.loc[target_organism]['#Reads_processed'],
+                    '%Unmapped':                 df.loc[target_organism]['%Unmapped'],
+                    '%One_hit_one_genome':       df.loc[target_organism]['%One_hit_one_genome'],
+                    '%Multiple_hits_one_genome': df.loc[target_organism]['%Multiple_hits_one_genome']
+                }
+            }
+        
+        if contaminants:
+            data['contaminants'] = {
+                    contaminant:{
+                        'Reads_processed':           df.loc[contaminant]['#Reads_processed'],
+                        '%Unmapped':                 df.loc[contaminant]['%Unmapped'],
+                        '%One_hit_one_genome':       df.loc[contaminant]['%One_hit_one_genome'],
+                        '%Multiple_hits_one_genome': df.loc[contaminant]['%Multiple_hits_one_genome']
+                    } for contaminant in contaminants
+                }
+
+        def write_read_report(path_to_report:str, read_num:int) -> None:
+            '''Read-based reprot writer to reduce amount of code. Usable only inside fastqscreen wrapper.'''
+            output_folder = os.path.abspath(os.path.dirname(path_to_report))
+            if   read_num == 1:
+                outpath = f'{output_folder}/{sample_id}_fastqscreen_1_et.json'
+                hk.write_json(data, outpath, indent=4)
+            elif read_num == 2:
+                outpath = f'{output_folder}/{sample_id}_fastqscreen_2_et.json'
+                hk.write_json(data, outpath, indent=4)
+
+        if   '_1_screen' in path_to_report: write_read_report(path_to_report=path_to_report, read_num=1)
+        elif '_2_screen' in path_to_report: write_read_report(path_to_report=path_to_report, read_num=2)
 
 
     @staticmethod
     def parse_ivar(sample_id:str, path_to_report:str) -> None:
-        '''Serializes report as python dictionary'''
+        '''Serializes report as json file'''
         df = pd.read_csv(path_to_report, sep='\r\n', engine='python')[19:-5].reset_index(drop=True)
-        if 'Results:' not in df.iloc[0].values:
-            new_header = df.iloc[0].values[0].split('\t')
-            df.columns=df.iloc[0].values
-            df[new_header] = df[df.columns[0]].str.split('\t', expand = True)
+        
+        if 'Results:' not in df.iloc[0].values:                                     #one variation discovered between seemingly identical ivar reports
+            new_header       = df.iloc[0].values[0].split('\t')
+            df.columns       = df.iloc[0].values
+            df[new_header]   = df[df.columns[0]].str.split('\t', expand = True)
         else:
-            new_header = df.iloc[1].values[0].split('\t')
-            df.columns=df.iloc[1].values
-            df[new_header] = df[df.columns[0]].str.split('\t', expand = True)
-        data = df[new_header][1:].set_index('Primer Name').to_dict()
+            new_header       = df.iloc[1].values[0].split('\t')
+            df.columns       = df.iloc[1].values
+            df[new_header]   = df[df.columns[0]].str.split('\t', expand = True)
+
+        data = df[new_header][1:].set_index('Primer Name').to_dict()                #getting trimmed primer count by name dict
+        
         data['ivar_version'] = Wrapper._ivar_version
-        data['command'] = Wrapper._rule_dict['primer_trimming'].split('\n')
-        data['options'] = Wrapper._config_dict['ivar']
-        hk.write_json(data, f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_ivar_et.json', indent=4)
+        data['command']      = Wrapper._rule_dict['primer_trimming'].split('\n')
+        data['options']      = Wrapper._config_dict['ivar']
+
+        output_folder        = os.path.abspath(os.path.dirname(path_to_report))
+        outpath              = f'{output_folder}/{sample_id}_ivar_et.json'
+
+        hk.write_json(data, outpath, indent=4)
 
                 
     @staticmethod
     def parse_qualimap(sample_id:str, path_to_report_cov:str, path_to_report_qual:str) -> None:
-        '''Serializes report as python dictionary'''
-        gen_cov_hist = pd.read_csv(path_to_report_cov, sep='\t')
-        gen_cov_hist = {gen_cov_hist.columns[0]: list(gen_cov_hist[gen_cov_hist.columns[0]]), gen_cov_hist.columns[1]: list(gen_cov_hist[gen_cov_hist.columns[1]])}
+        '''Serializes report as json file'''
+        gen_cov_hist  = pd.read_csv(path_to_report_cov, sep='\t')
         gen_mapq_hist = pd.read_csv(path_to_report_qual, sep='\t')
-        gen_mapq_hist = {gen_mapq_hist.columns[0]: list(gen_mapq_hist[gen_mapq_hist.columns[0]]), gen_mapq_hist.columns[1]: list(gen_mapq_hist[gen_mapq_hist.columns[1]])}
-        data = {**gen_cov_hist, **gen_mapq_hist}
+
+        #convert histograms to dicts
+        gen_cov_hist  = {
+             gen_cov_hist.columns[0]: list(gen_cov_hist[gen_cov_hist.columns[0]]), 
+             gen_cov_hist.columns[1]: list(gen_cov_hist[gen_cov_hist.columns[1]])
+            }
+        
+        gen_mapq_hist = {
+            gen_mapq_hist.columns[0]: list(gen_mapq_hist[gen_mapq_hist.columns[0]]), 
+            gen_mapq_hist.columns[1]: list(gen_mapq_hist[gen_mapq_hist.columns[1]])
+            }
+        
+        data = {**gen_cov_hist, **gen_mapq_hist}                                                               #combining histograms into single dictionary
+
         data['qualimap_version'] = Wrapper._qualimap_version
-        data['command'] = Wrapper._rule_dict['alignment_quality_control'].split('\n')
-        data['options'] = Wrapper._config_dict['qualimap']
-        hk.write_json(data, f'{os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(path_to_report_cov))))}/{sample_id}_qualimap_et.json', indent=4)
+        data['command']          = Wrapper._rule_dict['alignment_quality_control'].split('\n')
+        data['options']          = Wrapper._config_dict['qualimap']
+
+        output_folder = os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(path_to_report_cov)))) #qualimap report is placed under subdirectory
+        outpath = f'{output_folder}/{sample_id}_qualimap_et.json'
+        hk.write_json(data, outpath, indent=4)
 
 
     @staticmethod
     def parse_samtools(sample_id:str, path_to_report:str) -> None:
-        '''Serializes report as python dictionary'''
-        with open(path_to_report, 'r+') as f:
-            lines = f.readlines()
-        data = {'reads_mapped':lines[4].strip().split(' ')[0]}
+        '''Serializes report as json file'''
+        with open(path_to_report, 'r+') as f: lines = f.readlines()
+
+        data                     = {'reads_mapped':lines[4].strip().split(' ')[0]}
         data['samtools_version'] = Wrapper._samtools_version
-        data['command'] = Wrapper._rule_dict['alignment_quality_control'].split('\n')
-        hk.write_json(data, f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_samtools_et.json', indent=4)
+        data['command']          = Wrapper._rule_dict['alignment_quality_control'].split('\n')
+
+        output_folder            = os.path.abspath(os.path.dirname(path_to_report))
+        outpath                  = f'{output_folder}/{sample_id}_samtools_et.json'
+        hk.write_json(data, outpath, indent=4)
 
 
     @staticmethod
     def parse_pangolin(sample_id:str, path_to_report:str) -> None:
         report = pd.read_csv(path_to_report)
-        data = {
-            "lineage":      report['lineage'].values[0], 
-            "qc_status":    report['qc_status'].values[0], 
-            "qc_notes":     report['qc_notes'].values[0]
+        data   = {
+                "lineage"  :      report['lineage'].values[0], 
+                "qc_status":      report['qc_status'].values[0], 
+                "qc_notes" :      report['qc_notes'].values[0]
             }
+        
         data['pangolin_version'] = Wrapper._pangolin_version
-        data['command'] = Wrapper._rule_dict['pangolin']
-        data['options'] = Wrapper._config_dict['pangolin']
-        hk.write_json(data, f'{os.path.abspath(os.path.dirname(path_to_report))}/{sample_id}_pangolin_et.json', indent=4)
+        data['command']          = Wrapper._rule_dict['pangolin']
+        data['options']          = Wrapper._config_dict['pangolin']
+        
+        output_folder            = os.path.abspath(os.path.dirname(path_to_report))
+        outpath                  = f'{output_folder}/{sample_id}_pangolin_et.json'
+        hk.write_json(data, outpath, indent=4)
 
 
     @staticmethod
     def combine_jsons(sample_id:str, output_path:str, report_paths:list) -> None:
         _template_path = Wrapper._config_dict['sample_template']
-        _template = hk.read_json_dict(_template_path)
-        data = {os.path.basename(path).replace(f'{sample_id}_', '').replace('_et.json', ''):hk.read_json_dict(path) for path in report_paths}
+        _template      = hk.read_json_dict(_template_path)                                    #reading in json template
+        data = {}
 
-        #Add versions for all tools not explicitly serialized
+        for path in report_paths:
+            report_name = os.path.basename(path)
+
+            #infer corresponding read number from serialized report naming convention
+            if   '_1_et.json' in report_name:   read = 1                                      
+            elif '_2_et.json' in report_name:   read = 2                                      
+            else:                               read = ''                                     #non-read based report         
+
+            report_type = report_name.replace(f'{sample_id}_','')
+            key         = re.sub('(_[0-9])?_et.json', '', report_type)                        #tool name
+            results     = hk.read_json_dict(path)                                             #serialized results
+
+            conditions = [                                                                    #for processing separate reports for each read file
+                not (key in data) and not (read == ''),                                       #read-based report first time
+                key in data and read != ''                                                    #read-based report second time
+            ]
+ 
+            if   conditions[0]: data[key]                  = {f'read_{read}':results}
+            elif conditions[1]: data[key][f'read_{read}']  = results
+            else:               data[key]                  = results
+
+        #add versions for all tools not explicitly serialized or resulting in separate report for each read
         tool_dict = {
-            'cutadapt':[Wrapper._rule_dict['adapter_removal'].split('\n'), Wrapper._cutadapt_version, Wrapper._config_dict['cutadapt']],
-            'bwa-mem':[Wrapper._rule_dict['read_alignment'].split('\n'), Wrapper._bwamem_version, Wrapper._config_dict['bwa-mem']],
-            'picard':[Wrapper._rule_dict['indel_realignment'].split('\n'), Wrapper._picard_version, Wrapper._config_dict['picard']],
-            'abra':[Wrapper._rule_dict['indel_realignment'].split('\n'), Wrapper._abra_version, Wrapper._config_dict['abra']],
-            'snpEff':[Wrapper._rule_dict['variant_annotation'].split('\n'), Wrapper._snpeff_version, Wrapper._config_dict['snpEff']],
-            'freebayes':[Wrapper._rule_dict['variant_calling'].split('\n'), Wrapper._freebayes_version, Wrapper._config_dict['freebayes']]
+               'cutadapt': [Wrapper._rule_dict['adapter_removal'].split('\n'),     Wrapper._cutadapt_version,  Wrapper._config_dict['cutadapt']],
+                'bwa-mem': [Wrapper._rule_dict['read_alignment'].split('\n'),      Wrapper._bwamem_version,    Wrapper._config_dict['bwa-mem']],
+                 'picard': [Wrapper._rule_dict['indel_realignment'].split('\n'),   Wrapper._picard_version,    Wrapper._config_dict['picard']],
+                   'abra': [Wrapper._rule_dict['indel_realignment'].split('\n'),   Wrapper._abra_version,      Wrapper._config_dict['abra']],
+                 'snpEff': [Wrapper._rule_dict['variant_annotation'].split('\n'),  Wrapper._snpeff_version,    Wrapper._config_dict['snpEff']],
+              'freebayes': [Wrapper._rule_dict['variant_calling'].split('\n'),     Wrapper._freebayes_version, Wrapper._config_dict['freebayes']],
+            'fastqscreen': [Wrapper._rule_dict['fastq_screening'].split('\n'),     Wrapper._fastqc_version,    Wrapper._config_dict['fastqscreen']]
         }
-        for tool in tool_dict: data[tool] = {f'{tool}_version':tool_dict[tool][1], 'command':tool_dict[tool][0], 'options':tool_dict[tool][2]}
 
+        for tool in tool_dict:
+            if tool in data:                                            #not explicitly serialized
+                data[tool][f'{tool}_version'] =     tool_dict[tool][1]
+                data[tool]['command']         =     tool_dict[tool][0]
+                data[tool]['options']         =     tool_dict[tool][2]
+            else:                                                       #resulting in separate report for each read
+                data[tool] = {
+                    f'{tool}_version' : tool_dict[tool][1], 
+                    'command'         : tool_dict[tool][0], 
+                    'options'         : tool_dict[tool][2]
+                    }
 
-        #Populate the template
+        #populate the template
         for key in data: hk.edit_nested_dict(_template['data']['pipelines']['inhouse-covidpipe'], key, data[key])
 
-        hk.write_json(_template, f'{output_path}/{sample_id}_combined.json')
+        outpath = f'{output_path}/{sample_id}_combined.json'
+        hk.write_json(_template, outpath)
         
         
