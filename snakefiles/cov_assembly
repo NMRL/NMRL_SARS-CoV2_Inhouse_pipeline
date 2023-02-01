@@ -257,6 +257,29 @@ rule consensus_calling: #ok
         sed -i -E "s/_S[0-9]*\//\//" {output.consensus_fasta}
         '''
 
+
+rule pangolin:
+    input:
+        config['output_directory']+'{sample_id_pattern}_consensus.fasta'
+    output:
+        report = config['output_directory']+'{sample_id_pattern}_lineage_report.csv'
+    envmodules:
+        'singularity'
+    shell:
+        '''
+        singularity run {config[pangolin][sif_path]} pangolin {input[0]} -t {config[pangolin][threads]} --outfile {output.report}
+        '''
+
+
+rule serialize_pangolin:
+    input:
+        config['output_directory']+'{sample_id_pattern}_lineage_report.csv'
+    output:
+        config["output_directory"]+"{sample_id_pattern}_pangolin_et.json"
+    run:
+        wp.parse_pangolin(wildcards.sample_id_pattern, input[0])
+    
+
 rule fastq_screening: #ok
     input:
         fastq_sceen_sif = config['multiqc_sif'], #'/mnt/home/groups/nmrl/image_files/fastq_screen.sif',
@@ -292,7 +315,8 @@ rule serialize_fqscreen:
         read_1_profile_txt = config["output_directory"]+"{sample_id_pattern}_1_screen.txt",
         read_2_profile_txt = config["output_directory"]+"{sample_id_pattern}_2_screen.txt"
     output:
-        config["output_directory"]+"{sample_id_pattern}_fastqscreen_et.json"
+        config["output_directory"]+"{sample_id_pattern}_fastqscreen_1_et.json",
+        config["output_directory"]+"{sample_id_pattern}_fastqscreen_2_et.json"
     run:
         wp.parse_fqscreen(wildcards.sample_id_pattern, input.read_1_profile_txt)
         wp.parse_fqscreen(wildcards.sample_id_pattern, input.read_2_profile_txt)
@@ -302,7 +326,7 @@ rule serialize_fqscreen:
 rule vcf_to_csv: #ok
     input:
         sif_file = config["fastq_sif"],
-        fastq_sceen_sif = '/mnt/home/groups/nmrl/image_files/fastq_screen.sif',
+        fastq_sceen_sif = config["multiqc_sif"],
         annotated_variants = config['output_directory']+'{sample_id_pattern}.ann.vcf'
     output:
         annotated_csv = config['output_directory']+'{sample_id_pattern}.ann.csv'
@@ -317,7 +341,7 @@ rule vcf_to_csv: #ok
 rule depth_plot: #ok
     input:
         sif_file = config["fastq_sif"],
-        fastq_sceen_sif = '/mnt/home/groups/nmrl/image_files/fastq_screen.sif',
+        fastq_sceen_sif = config["multiqc_sif"],
         sequencing_depth = config['output_directory']+'{sample_id_pattern}_seq_depth.txt'
     output:
         sequencing_depth_plot = config['output_directory']+'{sample_id_pattern}_seq_depth_plot.html'
@@ -335,8 +359,9 @@ rule get_json:
         fqs=config["output_directory"]+"{sample_id_pattern}_fastqscreen_et.json",
         qmap=config['output_directory']+'{sample_id_pattern}_qualimap_et.json',
         ivar=config['output_directory']+'{sample_id_pattern}_ivar_et.json',
-        fastp=config['output_directory']+'{sample_id_pattern}_fastp_et.json'
+        fastp=config['output_directory']+'{sample_id_pattern}_fastp_et.json',
+        pangolin=config['output_directory']+'{sample_id_pattern}_pangolin_et.json'
     output:
         config['output_directory']+'{sample_id_pattern}_combined.json'
     run:
-        wp.combine_jsons(wildcards.sample_id_pattern, config['output_directory'], [input.samtools, input.fqs, input.qmap, input.ivar, input.fastp])
+        wp.combine_jsons(wildcards.sample_id_pattern, config['output_directory'], [input.samtools, input.fqs, input.qmap, input.ivar, input.fastp, input.pangolin])
