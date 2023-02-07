@@ -92,7 +92,7 @@ rule read_alignment: #ok
         sorted_bam = config['output_directory']+'{sample_id_pattern}_sorted.bam'
     shell:
         """
-        singularity run {input.sif_file} bwa mem {config[reference_path]} -v {config[bwa_verbose_level]} {input.read_1} {input.read_2} | singularity run {input.sif_file} samtools view -bS - | singularity run {input.sif_file} samtools sort -o {output.sorted_bam}
+        singularity run {input.sif_file} bwa mem {config[bwa-mem][reference_path]} -v {config[bwa-mem][bwa_verbose_level]} {input.read_1} {input.read_2} | singularity run {input.sif_file} samtools view -bS - | singularity run {input.sif_file} samtools sort -o {output.sorted_bam}
         """     
 
 
@@ -154,13 +154,13 @@ rule indel_realignment: #ok
             singularity run {input.sif_file} samtools sort -o {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_dedup.bam
             singularity run {input.sif_file} samtools index {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam
             singularity run {input.sif_file} bedtools bamtobed -i {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam > {output.sortrimmed_bed}
-            java -jar -Xmx$(({resources.mem_mb}/(1024) - 1/2))G {config[abra][abra_jar_path]} --threads {threads} --in {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam --out {output.realigned_bam} --ref {config[reference_path]} --targets {output.sortrimmed_bed} --tmpdir {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/
+            java -jar -Xmx$(({resources.mem_mb}/(1024) - 1/2))G {config[abra][abra_jar_path]} --threads {threads} --in {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam --out {output.realigned_bam} --ref {config[bwa-mem][reference_path]} --targets {output.sortrimmed_bed} --tmpdir {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/
             rm {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_dedup.bam
             rm {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam
             rm {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam.bai
         else
             singularity run {input.sif_file} bedtools bamtobed -i {input.sortrimmed_bam} > {output.sortrimmed_bed}
-            java -jar -Xmx$(({resources.mem_mb}/(1024) - 1/2))G {config[abra][abra_jar_path]} --threads {threads} --in {input.sortrimmed_bam} --out {output.realigned_bam} --ref {config[reference_path]} --targets {output.sortrimmed_bed} --tmpdir {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/
+            java -jar -Xmx$(({resources.mem_mb}/(1024) - 1/2))G {config[abra][abra_jar_path]} --threads {threads} --in {input.sortrimmed_bam} --out {output.realigned_bam} --ref {config[bwa-mem][reference_path]} --targets {output.sortrimmed_bed} --tmpdir {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/
         fi
         rm -r {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/
         """
@@ -168,13 +168,13 @@ rule indel_realignment: #ok
 
 rule alignment_quality_control: #ok
     input:
-        config['output_directory']+'{sample_id_pattern}_qualimap/'+'raw_data_qualimapReport/coverage_across_reference.txt',
-        config['output_directory']+'{sample_id_pattern}_qualimap/'+'raw_data_qualimapReport/mapping_quality_across_reference.txt',
         sif_file = config["fastq_sif"],
         qualimap_path = config['qualimap']["qualimap_sif_path"],
         sorted_raw_bam = config['output_directory']+'{sample_id_pattern}_sorted.bam',
         realigned_bam = config['work_dir']+'{sample_id_pattern}_unsort_markd.bam',
     output:
+        config['output_directory']+'{sample_id_pattern}_qualimap/'+'raw_data_qualimapReport/coverage_across_reference.txt',
+        config['output_directory']+'{sample_id_pattern}_qualimap/'+'raw_data_qualimapReport/mapping_quality_across_reference.txt',
         flagstat_report = config['output_directory']+'{sample_id_pattern}_mapped_report.txt',
         sequencing_depth = config['output_directory']+'{sample_id_pattern}_seq_depth.txt',
         sorted_realigned_bam = temp(config['output_directory']+'{sample_id_pattern}_markd.bam'),
@@ -226,7 +226,7 @@ rule variant_calling: #ok
         'singularity'
     shell:
         """
-        singularity run {input.sif_file} freebayes -f {config[reference_path]} {input.sorted_realigned_bam} | singularity run {input.sif_file} vcffilter -f "( QUAL > {config[freebayes][quality_filter]} )" AND "( DP > {config[freebayes][coverage_depth_filter]} )" > {output.vcf}
+        singularity run {input.sif_file} freebayes -f {config[bwa-mem][reference_path]} {input.sorted_realigned_bam} | singularity run {input.sif_file} vcffilter -f "( QUAL > {config[freebayes][quality_filter]} )" AND "( DP > {config[freebayes][coverage_depth_filter]} )" > {output.vcf}
         """ 
 
 
@@ -356,7 +356,8 @@ rule depth_plot: #ok
 rule get_json:
     input:
         samtools=config['output_directory']+'{sample_id_pattern}_samtools_et.json',
-        fqs=config["output_directory"]+"{sample_id_pattern}_fastqscreen_et.json",
+        fqs1=config["output_directory"]+"{sample_id_pattern}_fastqscreen_1_et.json",
+        fqs2=config["output_directory"]+"{sample_id_pattern}_fastqscreen_2_et.json",
         qmap=config['output_directory']+'{sample_id_pattern}_qualimap_et.json',
         ivar=config['output_directory']+'{sample_id_pattern}_ivar_et.json',
         fastp=config['output_directory']+'{sample_id_pattern}_fastp_et.json',
@@ -364,4 +365,4 @@ rule get_json:
     output:
         config['output_directory']+'{sample_id_pattern}_combined.json'
     run:
-        wp.combine_jsons(wildcards.sample_id_pattern, config['output_directory'], [input.samtools, input.fqs, input.qmap, input.ivar, input.fastp, input.pangolin])
+        wp.combine_jsons(wildcards.sample_id_pattern, config['output_directory'], [input.samtools, input.fqs1, input.fqs2, input.qmap, input.ivar, input.fastp, input.pangolin])
