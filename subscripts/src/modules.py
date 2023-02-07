@@ -41,7 +41,7 @@ class Module:
         self.targets = targets #to store file extensions of expected output files; used by fill_target_list, check_module_output
         self.requests = requests #to store file extensions for files that are neccessary to run the modules; used by remove_invalid_samples
         self.snakefile_path = snakefile_path #to the rule file to be run as single job on HPC if self.run_mode is True; used by submit_module_job
-        self.dry_run = "-np" if dry_run else "" #to store dry-run flag if it is supplied, else empty string is stored
+        self.dry_run = "-np --quiet" if dry_run else "" #to store dry-run flag if it is supplied, else empty string is stored
         self.force_all = "--forceall" if force_all else "" #to store forceall flag if it is supplied, else empty string is stored
         self.rule_graph = f"--rulegraph | dot -Tpdf > {self.module_name}.pdf" if rule_graph else "" #to store rule_graph flag if it is supplied, else empty string is stored
         self.unpack_output = unpack_output #used to move files outside sample folders and do a rerun; used by unfold_output
