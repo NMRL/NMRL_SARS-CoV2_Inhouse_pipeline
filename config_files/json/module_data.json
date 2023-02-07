@@ -1,7 +1,7 @@
 {
-    "cluster_config": "/mnt/home/jevgen01/nmrl/demo/CLUSTER/bact-cov-meta-etc/SARS-CoV2-pipe/config_files/yaml/cluster.yaml",
+    "cluster_config": "/mnt/home/jevgen01/nmrl/demo/CLUSTER/tools_global/workflows/SARS-CoV2-pipe/config_files/yaml/cluster.yaml",
     "snakefiles": {
-        "assembly": "/mnt/home/jevgen01/nmrl/demo/CLUSTER/bact-cov-meta-etc/SARS-CoV2-pipe/snakefiles/cov_assembly"
+        "assembly": "/mnt/home/jevgen01/nmrl/demo/CLUSTER/tools_global/workflows/SARS-CoV2-pipe/snakefiles/cov_assembly"
     },
     "assembly": {
         "targets": [
