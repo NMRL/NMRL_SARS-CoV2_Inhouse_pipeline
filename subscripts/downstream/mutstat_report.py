@@ -1,4 +1,4 @@
-#!/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/rbase_env/bin/python
+#!/mnt/beegfs2/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/rbase_env/bin/python
 import pandas as pd, sys, os, datetime, argparse, datetime, re
 
 parser = argparse.ArgumentParser(description='A script to calculate mutation statistics given range of dates or list of sample ids.') #argparser object to provide command-line functionality

@@ -205,7 +205,7 @@ rule consensus_calling: #ok
 
 rule fastq_screening: #ok
     input:
-        fastq_sceen_sif = config['multiqc_sif'], #'/mnt/home/groups/nmrl/image_files/fastq_screen.sif',
+        fastq_sceen_sif = config['multiqc_sif'], #'/mnt/beegfs2/home/groups/nmrl/image_files/fastq_screen.sif',
         read_1 = config['work_dir']+'{sample_id_pattern}_R1_001.fastq.gz',
         read_2 = config['work_dir']+'{sample_id_pattern}_R2_001.fastq.gz'
     output:
@@ -231,7 +231,7 @@ rule fastq_screening: #ok
 rule vcf_to_csv: #ok
     input:
         sif_file = config["fastq_sif"],
-        fastq_sceen_sif = '/mnt/home/groups/nmrl/image_files/fastq_screen.sif',
+        fastq_sceen_sif = '/mnt/beegfs2/home/groups/nmrl/image_files/fastq_screen.sif',
         annotated_variants = config['output_directory']+'{sample_id_pattern}.ann.vcf'
     output:
         annotated_csv = config['output_directory']+'{sample_id_pattern}.ann.csv'
@@ -245,7 +245,7 @@ rule vcf_to_csv: #ok
 rule depth_plot: #ok
     input:
         sif_file = config["fastq_sif"],
-        fastq_sceen_sif = '/mnt/home/groups/nmrl/image_files/fastq_screen.sif',
+        fastq_sceen_sif = '/mnt/beegfs2/home/groups/nmrl/image_files/fastq_screen.sif',
         sequencing_depth = config['output_directory']+'{sample_id_pattern}_seq_depth.txt'
     output:
         sequencing_depth_plot = config['output_directory']+'{sample_id_pattern}_seq_depth_plot.html'

@@ -1,11 +1,11 @@
-#!/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/rbase_env/bin/python
+#!/mnt/beegfs2/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/rbase_env/bin/python
 import pandas as pd, sys, shutil, re
 import argparse
 import os,  time
 
-db_file = [f'/mnt/home/groups/nmrl/cov_analysis/analysis_history/{file}' for file in os.listdir('/mnt/home/groups/nmrl/cov_analysis/analysis_history/') if 'summary_file' in file][0] #LOOKUP FOR THE DATABASE FILE IN THE FOLDER WHERE SCRIPT IS LOCATED
-log_path = '/mnt/home/groups/nmrl/cov_analysis/analysis_history/database_log_files'
-backup_path = '/mnt/home/groups/nmrl/cov_analysis/analysis_history/backup'
+db_file = [f'/mnt/beegfs2/home/groups/nmrl/cov_analysis/analysis_history/{file}' for file in os.listdir('/mnt/beegfs2/home/groups/nmrl/cov_analysis/analysis_history/') if 'summary_file' in file][0] #LOOKUP FOR THE DATABASE FILE IN THE FOLDER WHERE SCRIPT IS LOCATED
+log_path = '/mnt/beegfs2/home/groups/nmrl/cov_analysis/analysis_history/database_log_files'
+backup_path = '/mnt/beegfs2/home/groups/nmrl/cov_analysis/analysis_history/backup'
 print(f'Current database file: {db_file}')
 cur_time = time.strftime("%d_%m_%Y") #TO TIMESTAMP UPDATES OF SUMMARY FILES IN FILE NAME
 

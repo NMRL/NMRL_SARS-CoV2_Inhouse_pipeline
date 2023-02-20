@@ -1,10 +1,10 @@
-#!/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/rbase_env/bin/python
+#!/mnt/beegfs2/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/rbase_env/bin/python
 
 from docxtpl import DocxTemplate
 import time, pandas as pd, sys, pathlib, datetime
 
 #Import template document + paths to files with data_1 & plots
-template = DocxTemplate('/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/downstream/tessy_report_template.docx')
+template = DocxTemplate('/mnt/beegfs2/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/downstream/tessy_report_template.docx')
 if len(sys.argv) < 2:
     sys.exit('Path to mutation report is required! (mutation_report.py can be used to produce it)')
 

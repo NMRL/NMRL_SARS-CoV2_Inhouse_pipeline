@@ -1,4 +1,4 @@
-#!/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/rbase_env/bin/python
+#!/mnt/beegfs2/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/rbase_env/bin/python
 ##########
 #IMPORTS
 ##########
@@ -16,13 +16,13 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=UserWarning)
 
 #PATHS
-subprocess_path = f'/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/subscripts/downstream/'
-covid_output_path = "/mnt/home/groups/nmrl/cov_analysis/covid_output/"
-report_folder_path = f'/mnt/home/groups/nmrl/cov_analysis/reports'
-raw_folder_path = f'/mnt/home/groups/nmrl/cov_analysis/raw'
-filter_path = f'/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/downstream/report_filters.txt'
-default_metadata_path = "/mnt/home/groups/nmrl/cov_analysis/metadata/spkc_latest_3_month.csv"
-log_folder_path = "/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/covipipe_job_logs/"
+subprocess_path = f'/mnt/beegfs2/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/subscripts/downstream/'
+covid_output_path = "/mnt/beegfs2/home/groups/nmrl/cov_analysis/covid_output/"
+report_folder_path = f'/mnt/beegfs2/home/groups/nmrl/cov_analysis/reports'
+raw_folder_path = f'/mnt/beegfs2/home/groups/nmrl/cov_analysis/raw'
+filter_path = f'/mnt/beegfs2/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/downstream/report_filters.txt'
+default_metadata_path = "/mnt/beegfs2/home/groups/nmrl/cov_analysis/metadata/spkc_latest_3_month.csv"
+log_folder_path = "/mnt/beegfs2/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/covipipe_job_logs/"
 
 #TIMESTAMPS & STATIC STRINGS
 pipeline_string = 'bwa 0.7.17-r1198-dirty mem'

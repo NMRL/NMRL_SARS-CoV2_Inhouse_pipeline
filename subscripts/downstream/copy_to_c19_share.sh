@@ -9,13 +9,13 @@
 
 ###This script can be used to copy bam, fasta & vcf files from covid_output/ to c19data_share based on sample ids provided as list in c19_share_update.txt
 #Usage:
-#1.Add sample ids to the c19_share_update.txt file (replace old ids)
+#1.Add sample ids to the c19_share_update.txt file (replace old ids)H
 #2.add n(dry-run) to the RSYNC_OPTS string
 #3.run the script to see if it works correctly
 #4.Fix the script or the file list if there are some problems
 #5.Remove n from RSYNC_OPTS and run the script when you are sure that everything is fine
 
-cd "/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/subscripts/downstream/"
+cd "/mnt/beegfs2/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/subscripts/downstream/"
 C19_SHARE_PATH="/home/groups/c19data_share/NMRL/"
 RSYNC_OPTS='rsync -ghpv --ignore-existing'
 #g - keep groups
@@ -24,8 +24,8 @@ RSYNC_OPTS='rsync -ghpv --ignore-existing'
 #v - more information to standard output
 #h - human-readable
 
-FILE_LIST_PATH='/mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/downstream/c19_share_update.txt'
-COVID_OUTPUT_PATH='/mnt/home/groups/nmrl/cov_analysis/covid_output/'
+FILE_LIST_PATH='/mnt/beegfs2/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/downstream/c19_share_update.txt'
+COVID_OUTPUT_PATH='/mnt/beegfs2/home/groups/nmrl/cov_analysis/covid_output/'
 SAMPLE_COUNT=$(cat ${FILE_LIST_PATH} | grep -v 'processing' | wc -l)
 RUN_PATH=${1} #IF NO FOLDER NAME IS PROVIDED, THE SCRIPT WILL LOOK IN ALL COVID_OUTPUT, WHICH TAKES LONGER
 
@@ -76,7 +76,7 @@ dry_run=$(python -c "print('n' in '${RSYNC_OPTS}'.split(' ')[1])") #CHECK IF IT 
 if [ $dry_run == 'False' ]; then
     echo 'Updating metadata file and reaplying permissions'
     rm ${C19_SHARE_PATH}summary_file*
-    cp /mnt/home/groups/nmrl/cov_analysis/analysis_history/summary_file* ${C19_SHARE_PATH}
+    cp /mnt/beegfs2/home/groups/nmrl/cov_analysis/analysis_history/summary_file* ${C19_SHARE_PATH}
     chmod -R 775 ${C19_SHARE_PATH}bam/
     chmod -R 775 ${C19_SHARE_PATH}vcf/
     chmod -R 775 ${C19_SHARE_PATH}fasta/
