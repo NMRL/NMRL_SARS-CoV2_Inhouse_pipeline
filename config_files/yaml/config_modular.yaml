@@ -39,7 +39,8 @@ bwa_verbose_level: 3
 
 #ivar
 ##primer_trimming
-primer_path: /mnt/beegfs2/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/primers/SARSCOV2_primers_v4-29.03.2022.bed
+primer_path: /mnt/beegfs2/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/primers/ESIB_EQA_2023.SARS2.primers.bed
+  #/mnt/beegfs2/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/primers/SARSCOV2_primers_v4-29.03.2022.bed
   #/mnt/beegfs2/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/primers/QIAseqDIRECTSARSCoV2primersfinal.bed
   #/mnt/beegfs2/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/resources/primers/QIAseq_SARSCOV2_primers_v3-13.04.2021.bed
 

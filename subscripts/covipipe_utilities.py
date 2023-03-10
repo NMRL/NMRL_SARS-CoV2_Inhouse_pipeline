@@ -56,12 +56,12 @@ class covipipe_housekeeper(hk):
         new_path = path_to_fastq
         #replace prefix
         for prefix in prefix_patterns: 
-            if re.search(prefix,new_path).group(0) is not None: #if pattern is detected in file name
+            if re.search(prefix,new_path) is not None: #if pattern is detected in file name
                 new_path = re.sub(prefix,"",new_path) #replace
                 break #done with prefixes
         #replace suffix
         for suffix in suffix_patterns:
-            if re.search(suffix,new_path).group(0) is not None: #if pattern is detected in file name
+            if re.search(suffix,new_path) is not None: #if pattern is detected in file name
                 new_path = re.sub(suffix,"",new_path) #replace
                 break #done with suffixes
         #convert fastq part to illumina format
