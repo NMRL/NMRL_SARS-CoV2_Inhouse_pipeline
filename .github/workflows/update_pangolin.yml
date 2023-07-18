@@ -4,7 +4,6 @@
 # Run actions on cron schedule: https://docs.getnacelle.com/deployment/scheduled-builds-github-actions.html#add-the-webhook-url
 # SSH copy: https://github.com/marketplace/actions/copy-via-ssh
 # Encrypted secrets: https://docs.github.com/en/actions/security-guides/encrypted-secrets
-# Switched scp through different login node 
 
 name: Trigger pangolin image update based on push to snakemake/pangolin_update.log
 
@@ -28,10 +27,10 @@ jobs:
           singularity build --force --fakeroot pangolin.sif config_files/s_recipes/pangolin.recipe
           chmod 775 pangolin.sif
       - name: Copy single file to remote
-        uses: appleboy/scp-action@v0.1.4
+        uses: garygrossgarten/github-action-scp@release
         with:
           host: ${{ secrets.HPC_HOST }}
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASS }}
-          source: /home/runner/work/SARS-CoV2-pipe/SARS-CoV2-pipe/pangolin.sif
-          target: ${{ secrets.HOST_IMAGES }}pangolin.sif
+          local: /home/runner/work/SARS-CoV2-pipe/SARS-CoV2-pipe/pangolin.sif
+          remote: ${{ secrets.HOST_IMAGES }}pangolin.sif
