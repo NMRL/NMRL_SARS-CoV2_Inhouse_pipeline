@@ -34,4 +34,4 @@ jobs:
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASS }}
           source: /home/runner/work/SARS-CoV2-pipe/SARS-CoV2-pipe/pangolin.sif
-          remote: ${{ secrets.HOST_IMAGES }}pangolin.sif
+          target: ${{ secrets.HOST_IMAGES }}pangolin.sif
