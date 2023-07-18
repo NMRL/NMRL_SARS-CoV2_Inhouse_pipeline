@@ -28,10 +28,10 @@ jobs:
           singularity build --force --fakeroot pangolin.sif config_files/s_recipes/pangolin.recipe
           chmod 775 pangolin.sif
       - name: Copy single file to remote
-        uses: garygrossgarten/github-action-scp@release
+        uses: appleboy/scp-action@v0.1.4
         with:
-          local: /home/runner/work/SARS-CoV2-pipe/SARS-CoV2-pipe/pangolin.sif
-          remote: ${{ secrets.HOST_IMAGES }}pangolin.sif
           host: ${{ secrets.HPC_HOST }}
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASS }}
+          source: /home/runner/work/SARS-CoV2-pipe/SARS-CoV2-pipe/pangolin.sif
+          remote: ${{ secrets.HOST_IMAGES }}pangolin.sif
