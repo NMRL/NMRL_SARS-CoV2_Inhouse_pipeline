@@ -21,7 +21,7 @@ rule all:
             echo echo Sample assembly finished, multiqc finished before.
         else
             echo Sample assembly finished, starting multiqc.
-            singularity run {input.multiqc_sif} multiqc {config[output_directory]} -o {config[output_directory]} --flat
+            singularity --silent run --bind {config[output_directory]}:{config[output_directory]} {input.multiqc_sif} multiqc {config[output_directory]} -o {config[output_directory]} --flat
         fi
         '''
         
@@ -41,7 +41,7 @@ rule adapter_removal: #ok
         '''
         touch {output.read_1}
         touch {output.read_2}
-        singularity run {input.sif_file} cutadapt -a {config[forward_adapter]} -A {config[reverse_adapter]} -o {output.read_1} -p {output.read_2} "{input.read_1}" "{input.read_2}" > {output.cutadapt_report}
+        singularity --silent run --bind {config[output_directory]},{config[work_dir]}:{config[output_directory]},{config[work_dir]} {input.sif_file} cutadapt -a {config[forward_adapter]} -A {config[reverse_adapter]} -o {output.read_1} -p {output.read_2} "{input.read_1}" "{input.read_2}" > {output.cutadapt_report}
         '''
 
 
@@ -59,7 +59,7 @@ rule quality_control: #ok
         fastp_report_json = config['output_directory']+'{sample_id_pattern}_fastp_report.json'
     shell:
         """
-        singularity run {input.sif_file} fastp -y -p -h {output.fastp_report_html} -j {output.fastp_report_json} -i {input.read_1} -I {input.read_2} -o {output.read_1} -O {output.read_2} -l {config[fastp_length_filter]} -q {config[fastp_quality_filter]}
+        singularity --silent run --bind {config[output_directory]},{config[work_dir]}:{config[output_directory]},{config[work_dir]} {input.sif_file} fastp -y -p -h {output.fastp_report_html} -j {output.fastp_report_json} -i {input.read_1} -I {input.read_2} -o {output.read_1} -O {output.read_2} -l {config[fastp_length_filter]} -q {config[fastp_quality_filter]}
         """
 
 
@@ -74,7 +74,9 @@ rule read_alignment: #ok
         sorted_bam = config['output_directory']+'{sample_id_pattern}_sorted.bam'
     shell:
         """
-        singularity run {input.sif_file} bwa mem {config[reference_path]} -v {config[bwa_verbose_level]} {input.read_1} {input.read_2} | singularity run {input.sif_file} samtools view -bS - | singularity run {input.sif_file} samtools sort -o {output.sorted_bam}
+        singularity --silent run --bind {config[output_directory]},{config[work_dir]}:{config[output_directory]},{config[work_dir]} {input.sif_file} bwa mem {config[reference_path]} -v {config[bwa_verbose_level]} {input.read_1} {input.read_2} \
+        | singularity --silent run --bind {config[output_directory]},{config[work_dir]}:{config[output_directory]},{config[work_dir]} {input.sif_file} samtools view -bS - \
+        | singularity --silent run --bind {config[output_directory]},{config[work_dir]}:{config[output_directory]},{config[work_dir]} {input.sif_file} samtools sort -o {output.sorted_bam}
         """
 
 
@@ -92,10 +94,10 @@ rule primer_trimming: #ok
         ivar_log = config['output_directory']+'{sample_id_pattern}_ivar_log.txt'
     shell:
         """
-        singularity run {input.sif_file} samtools index {input.sorted_bam}
-        singularity run {input.sif_file} ivar trim -e -b {config[primer_path]} -p {output.trimmed_bam} -i {input.sorted_bam} > {output.ivar_log}
-        singularity run {input.sif_file} samtools sort -o {output.sortrimmed_bam} {output.trimmed_bam}
-        singularity run {input.sif_file} samtools index {output.sortrimmed_bam}
+        singularity --silent run --bind {config[output_directory]}:{config[output_directory]} {input.sif_file} samtools index {input.sorted_bam}
+        singularity --silent run --bind {config[output_directory]}:{config[output_directory]} {input.sif_file} ivar trim -e -b {config[primer_path]} -p {output.trimmed_bam} -i {input.sorted_bam} > {output.ivar_log}
+        singularity --silent run --bind {config[output_directory]}:{config[output_directory]} {input.sif_file} samtools sort -o {output.sortrimmed_bam} {output.trimmed_bam}
+        singularity --silent run --bind {config[output_directory]}:{config[output_directory]} {input.sif_file} samtools index {output.sortrimmed_bam}
         """
 
 
@@ -121,15 +123,15 @@ rule indel_realignment: #ok
 
         if [ $(zcat {input.read_1} | echo $((`wc -l`/(4)))) -gt {config[dedup_threshold]} ]; then
             java -jar {config[picard_jar_path]} MarkDuplicates -I {input.sortrimmed_bam} -O {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_dedup.bam -M {config[output_directory]}{wildcards.sample_id_pattern}_picard_dp.txt --REMOVE_DUPLICATES
-            singularity run {input.sif_file} samtools sort -o {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_dedup.bam
-            singularity run {input.sif_file} samtools index {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam
-            singularity run {input.sif_file} bedtools bamtobed -i {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam > {output.sortrimmed_bed}
+            singularity --silent run --bind {config[output_directory]},{config[work_dir]}:{config[output_directory]},{config[work_dir]} {input.sif_file} samtools sort -o {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_dedup.bam
+            singularity --silent run --bind {config[output_directory]},{config[work_dir]}:{config[output_directory]},{config[work_dir]} {input.sif_file} samtools index {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam
+            singularity --silent run --bind {config[output_directory]},{config[work_dir]}:{config[output_directory]},{config[work_dir]} {input.sif_file} bedtools bamtobed -i {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam > {output.sortrimmed_bed}
             java -jar -Xmx$(({resources.mem_mb}/(1024) - 1/2))G {config[abra_jar_path]} --threads {threads} --in {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam --out {output.realigned_bam} --ref {config[reference_path]} --targets {output.sortrimmed_bed} --tmpdir {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/
             rm {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_dedup.bam
             rm {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam
             rm {config[work_dir]}{wildcards.sample_id_pattern}_trimmed_sorted_dedup.bam.bai
         else
-            singularity run {input.sif_file} bedtools bamtobed -i {input.sortrimmed_bam} > {output.sortrimmed_bed}
+            singularity --silent run --bind {config[output_directory]},{config[work_dir]}:{config[output_directory]},{config[work_dir]} {input.sif_file} bedtools bamtobed -i {input.sortrimmed_bam} > {output.sortrimmed_bed}
             java -jar -Xmx$(({resources.mem_mb}/(1024) - 1/2))G {config[abra_jar_path]} --threads {threads} --in {input.sortrimmed_bam} --out {output.realigned_bam} --ref {config[reference_path]} --targets {output.sortrimmed_bed} --tmpdir {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/
         fi
         rm -r {config[work_dir]}tmpdir_{wildcards.sample_id_pattern}/
@@ -153,12 +155,12 @@ rule alignment_quality_control: #ok
     shell:
         """
         
-        singularity run {input.sif_file} samtools flagstat {input.sorted_raw_bam} > {output.flagstat_report};
-        singularity run {input.sif_file} samtools sort -o {output.sorted_realigned_bam} {input.realigned_bam};
-        singularity run {input.sif_file} samtools index {output.sorted_realigned_bam};
-        singularity run {input.sif_file} samtools depth {output.sorted_realigned_bam} > {output.sequencing_depth};
+        singularity --silent run --bind {config[output_directory]},{config[work_dir]}:{config[output_directory]},{config[work_dir]} {input.sif_file} samtools flagstat {input.sorted_raw_bam} > {output.flagstat_report};
+        singularity --silent run --bind {config[output_directory]},{config[work_dir]}:{config[output_directory]},{config[work_dir]} {input.sif_file} samtools sort -o {output.sorted_realigned_bam} {input.realigned_bam};
+        singularity --silent run --bind {config[output_directory]},{config[work_dir]}:{config[output_directory]},{config[work_dir]} {input.sif_file} samtools index {output.sorted_realigned_bam};
+        singularity --silent run --bind {config[output_directory]},{config[work_dir]}:{config[output_directory]},{config[work_dir]} {input.sif_file} samtools depth {output.sorted_realigned_bam} > {output.sequencing_depth};
         mkdir -p {config[output_directory]}{wildcards.sample_id_pattern}_qualimap;
-        singularity run {input.qualimap_path} qualimap bamqc -bam {output.sorted_realigned_bam} -outdir {config[output_directory]}{wildcards.sample_id_pattern}_qualimap --java-mem-size={config[qualimap_memory_limit_gb]}G || echo WARNING: No reads mapped to the reference -- {output.sorted_realigned_bam}; touch {output.qualimap_report}
+        singularity --silent run --bind {config[output_directory]},{config[work_dir]}:{config[output_directory]},{config[work_dir]} {input.qualimap_path} qualimap bamqc -bam {output.sorted_realigned_bam} -outdir {config[output_directory]}{wildcards.sample_id_pattern}_qualimap --java-mem-size={config[qualimap_memory_limit_gb]}G || echo WARNING: No reads mapped to the reference -- {output.sorted_realigned_bam}; touch {output.qualimap_report}
         """
 
 rule variant_calling: #ok
@@ -172,7 +174,8 @@ rule variant_calling: #ok
         'singularity'
     shell:
         """
-        singularity run {input.sif_file} freebayes -f {config[reference_path]} {input.sorted_realigned_bam} | singularity run {input.sif_file} vcffilter -f "( QUAL > {config[quality_filter]} )" AND "( DP > {config[coverage_depth_filter]} )" > {output.vcf}
+        singularity --silent run --bind {config[output_directory]},{config[work_dir]}:{config[output_directory]},{config[work_dir]} {input.sif_file} freebayes -f {config[reference_path]} {input.sorted_realigned_bam} | \
+        singularity --silent run --bind {config[output_directory]},{config[work_dir]}:{config[output_directory]},{config[work_dir]} {input.sif_file} vcffilter -f "( QUAL > {config[quality_filter]} )" AND "( DP > {config[coverage_depth_filter]} )" > {output.vcf}
         """ 
 
 
@@ -197,7 +200,7 @@ rule consensus_calling: #ok
         'singularity'
     shell:
         '''
-        singularity run {input.sif_file} samtools mpileup -aa -A -d {config[use_upper_depth_limit]} -Q {config[cons_quality_filter]} {input.sorted_realigned_bam} | singularity run {input.sif_file} ivar consensus -p {config[output_directory]}{wildcards.sample_id_pattern}_consensus.fa -t {config[cons_min_variant_supporting_read_fraction]} -m {config[cons_min_coverage]} -q {config[cons_quality_filter]}
+        singularity --silent run --bind {config[output_directory]},{config[work_dir]}:{config[output_directory]},{config[work_dir]} {input.sif_file} samtools mpileup -aa -A -d {config[use_upper_depth_limit]} -Q {config[cons_quality_filter]} {input.sorted_realigned_bam} | singularity --silent run --bind {config[output_directory]},{config[work_dir]}:{config[output_directory]},{config[work_dir]} {input.sif_file} ivar consensus -p {config[output_directory]}{wildcards.sample_id_pattern}_consensus.fa -t {config[cons_min_variant_supporting_read_fraction]} -m {config[cons_min_coverage]} -q {config[cons_quality_filter]}
         mv {config[output_directory]}{wildcards.sample_id_pattern}_consensus.fa {output.consensus_fasta}
         sed -i "s/>Consensus_{wildcards.sample_id_pattern}_consensus_threshold_0.5_quality_30/>hCoV-19\/Latvia\/{wildcards.sample_id_pattern}\/$(date +"%Y")/" {output.consensus_fasta}
         sed -i -E "s/_S[0-9]*\//\//" {output.consensus_fasta}
@@ -205,7 +208,7 @@ rule consensus_calling: #ok
 
 rule fastq_screening: #ok
     input:
-        fastq_sceen_sif = config['multiqc_sif'], #'/mnt/beegfs2/home/groups/nmrl/image_files/fastq_screen.sif',
+        fastq_sceen_sif = config['fq_screen_sif'], #'/mnt/beegfs2/home/groups/nmrl/image_files/fastq_screen.sif',
         read_1 = config['work_dir']+'{sample_id_pattern}_R1_001.fastq.gz',
         read_2 = config['work_dir']+'{sample_id_pattern}_R2_001.fastq.gz'
     output:
@@ -217,11 +220,11 @@ rule fastq_screening: #ok
         'singularity'
     shell:
         """
-        cd /home/groups/nmrl/
+        cd {config[fq_screen_db_path]}
         downsample_r1=$(zcat {input.read_1} | echo $((`wc -l`/(4*{config[read1_downsample_fraction]}))))
         downsample_r2=$(zcat {input.read_2} | echo $((`wc -l`/(4*{config[read2_downsample_fraction]}))))
-        singularity run {input.fastq_sceen_sif} fastq_screen --subset $downsample_r1 -conf {config[fq_screen_config]} {input.read_1} --outdir {config[output_directory]}
-        singularity run {input.fastq_sceen_sif} fastq_screen --subset $downsample_r2 -conf {config[fq_screen_config]} {input.read_2} --outdir {config[output_directory]}
+        singularity --silent run --bind {config[output_directory]},{config[work_dir]},{config[fq_screen_db_path]}:{config[output_directory]},{config[work_dir]},{config[fq_screen_db_path]} {input.fastq_sceen_sif} fastq_screen --aligner {config[fq_screen_aligner]} --subset $downsample_r1 -conf {config[fq_screen_config]} {input.read_1} --outdir {config[output_directory]}
+        singularity --silent run --bind {config[output_directory]},{config[work_dir]},{config[fq_screen_db_path]}:{config[output_directory]},{config[work_dir]},{config[fq_screen_db_path]} {input.fastq_sceen_sif} fastq_screen --aligner {config[fq_screen_aligner]} --subset $downsample_r2 -conf {config[fq_screen_config]} {input.read_2} --outdir {config[output_directory]}
         mv {config[output_directory]}{wildcards.sample_id_pattern}_*R1*_screen.txt {output.read_1_profile_txt}
         mv {config[output_directory]}{wildcards.sample_id_pattern}_*R1*_screen.html {output.read_1_profile_html}
         mv {config[output_directory]}{wildcards.sample_id_pattern}_*R2*_screen.txt {output.read_2_profile_txt}
@@ -239,7 +242,7 @@ rule vcf_to_csv: #ok
         'singularity'
     shell:
         '''
-        singularity run {input.sif_file} python {config[assembly_subscripts]}vcf_to_csv_cmd.py {input.annotated_variants} {output.annotated_csv}
+        singularity --silent run --bind {config[output_directory]},{config[work_dir]}:{config[output_directory]},{config[work_dir]} {input.sif_file} python {config[assembly_subscripts]}vcf_to_csv_cmd.py {input.annotated_variants} {output.annotated_csv}
         '''
 
 rule depth_plot: #ok
@@ -253,5 +256,5 @@ rule depth_plot: #ok
         'singularity'
     shell:
         """
-        singularity run {input.sif_file} python {config[assembly_subscripts]}depth_plot.py {input.sequencing_depth} {output.sequencing_depth_plot}
+        singularity --silent run --bind {config[output_directory]},{config[work_dir]}:{config[output_directory]},{config[work_dir]} {input.sif_file} python {config[assembly_subscripts]}depth_plot.py {input.sequencing_depth} {output.sequencing_depth_plot}
         """

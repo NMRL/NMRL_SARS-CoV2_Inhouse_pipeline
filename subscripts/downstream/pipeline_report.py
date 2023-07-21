@@ -650,7 +650,6 @@ if __name__ == "__main__":
         report_path = str(pathlib.Path(source_files_path).parents[0]) #PATH TO FOLDER WHERE REPORTS SHOULD BE SAVED
         pathlib.Path(source_files_path).mkdir(parents=True, exist_ok=True)
 
-
     #COPY FILES REQUIRED FOR REPORT TO THE SOURCE_FILES FOLDER UNDER CREATED REPORTS FOLDER
     for context in context_path_map:
         print(f'Copying {context} files:')

@@ -8,6 +8,7 @@
 #PBS -A rakus
 
 #THE SCRIPT IS USED TO RUN PANGOLIN FROM SINGULARITY CONTAINER WITH DOWNSTREAM/MUTATION_REPORT.PY SCRIPT
+source /opt/exp_soft/conda/anaconda3/bin/activate /opt/exp_soft/conda/anaconda3
 ctrl_arg1=${1:-1} #IF NO PARAMETER VALUE PROVIDED, SET 1ST PARAMETER VALUE TO 1 (PERFORM PANGOLIN TYPING)
 pango_sif_path=$(find /mnt/home/groups/nmrl/image_files/ -type f -name "pangolin.sif") #PATH TO PANGOLIN CONTAINER
 ctrl_arg2=${2:-"~/"} #IF NO PARAMETER SUPPLIED, SET TO 0, ELSE SET TO PROVIDED VALUE - PATH WHERE TO RUN PANGOLIN
@@ -21,5 +22,6 @@ else
 fi
 
 awk '{print}' *.fasta > ${now}_combined.fasta
-singularity run $pango_sif_path pangolin ${now}_combined.fasta -t 20 --outfile ${now}_lineage_report.csv # RUNNING PANGOLIN AND PROVIDING TIME-DEPENDENT OUTPUT FILE NAMING
+echo singularity run $pango_sif_path pangolin $(pwd)/${now}_combined.fasta -t 20 --outfile $(pwd)/${now}_lineage_report.csv # RUNNING PANGOLIN AND PROVIDING TIME-DEPENDENT OUTPUT FILE NAMING
+singularity --silent run --bind $(pwd):$(pwd) $pango_sif_path pangolin $(pwd)/${now}_combined.fasta -t 20 --outfile $(pwd)/${now}_lineage_report.csv # RUNNING PANGOLIN AND PROVIDING TIME-DEPENDENT OUTPUT FILE NAMING
 

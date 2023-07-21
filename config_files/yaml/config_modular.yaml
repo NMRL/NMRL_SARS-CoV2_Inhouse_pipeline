@@ -72,7 +72,10 @@ snpEff_memory_limit_gb: 8
 snpEff_reference: MN908947
 
 #fastq_screen
-fq_screen_config: db/db-fastq-screen/fastq_screen.conf
+fq_screen_db_path: /mnt/beegfs2/home/groups/nmrl/db/db-fastq-screen/
+fq_screen_aligner: bowtie2
+fq_screen_config: /mnt/beegfs2/home/groups/nmrl/db/db-fastq-screen/fastq_screen.conf
+fq_screen_sif: /mnt/beegfs2/home/groups/nmrl/image_files/fastq_screen.sif
 read1_downsample_fraction: 5 #what part of reads will be screened against fqscreen db (expected denominator of a fraction, e.g. if 20% (1/5) of the reads needed, 5 is expected)
 read2_downsample_fraction: 5
 

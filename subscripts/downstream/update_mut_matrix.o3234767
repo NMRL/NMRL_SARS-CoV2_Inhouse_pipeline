@@ -1,0 +1,79 @@
+/mnt/home/jevgen01/.bashrc: line 27: conda: command not found
+sys:1: DtypeWarning: Columns (12) have mixed types.Specify dtype option on import or set low_memory=False.
+Total files to process: 39308
+/mnt/home/groups/nmrl/cov_analysis/mutation_heatmap/mutation_files/2103067537.ann.csv
+mv: cannot move ‘/mnt/beegfs2/home/groups/nmrl/cov_analysis/mutation_heatmap/mut_heatmap_data/mutāciju_apkopojums_2022-10-13_files’ to ‘/mnt/beegfs2/home/groups/nmrl/cov_analysis/mutation_heatmap/mut_heatmap_data/backup/mutāciju_apkopojums_2022-10-13_files’: File exists
+mv: cannot move ‘/mnt/beegfs2/home/groups/nmrl/cov_analysis/mutation_heatmap/mut_heatmap_data/mutāciju_apkopojums_2023-01-30_files’ to ‘/mnt/beegfs2/home/groups/nmrl/cov_analysis/mutation_heatmap/mut_heatmap_data/backup/mutāciju_apkopojums_2023-01-30_files’: File exists
+mv: cannot move ‘/mnt/beegfs2/home/groups/nmrl/cov_analysis/mutation_heatmap/mut_heatmap_data/mutāciju_apkopojums_2023-02-03_files’ to ‘/mnt/beegfs2/home/groups/nmrl/cov_analysis/mutation_heatmap/mut_heatmap_data/backup/mutāciju_apkopojums_2023-02-03_files’: File exists
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+Warning message:
+package ‘dplyr’ was built under R version 4.1.3 
+Warning message:
+package ‘ggplot2’ was built under R version 4.1.3 
+── Attaching packages ─────────────────────────────────────── tidyverse 1.3.2 ──
+✔ tibble  3.1.7     ✔ purrr   0.3.4
+✔ tidyr   1.2.0     ✔ stringr 1.4.0
+✔ readr   2.1.2     ✔ forcats 0.5.1
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+Warning message:
+package ‘tibble’ was built under R version 4.1.3 
+
+Attaching package: ‘lubridate’
+
+The following objects are masked from ‘package:base’:
+
+    date, intersect, setdiff, union
+
+
+Attaching package: ‘scales’
+
+The following object is masked from ‘package:purrr’:
+
+    discard
+
+The following object is masked from ‘package:readr’:
+
+    col_factor
+
+
+Attaching package: ‘tsibble’
+
+The following object is masked from ‘package:lubridate’:
+
+    interval
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, union
+
+
+Attaching package: ‘plotly’
+
+The following object is masked from ‘package:ggplot2’:
+
+    last_plot
+
+The following object is masked from ‘package:stats’:
+
+    filter
+
+The following object is masked from ‘package:graphics’:
+
+    layout
+
+sed: couldn't edit /mnt/beegfs2/home/groups/nmrl/cov_analysis/mutation_heatmap/mut_heatmap_data/mutāciju_apkopojums_2022-10-13_files: not a regular file
+Finished mutation frequency computations in 1147.25 seconds.
+Starting filtering by 2 consecutive dates.
+Adding permissions & performing cleanup

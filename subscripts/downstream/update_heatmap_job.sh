@@ -7,7 +7,8 @@
 #PBS -j oe
 #PBS -A rakus
 
-eval "$(conda shell.bash hook)" 
+# eval "$(conda shell.bash hook)" 
+source /opt/exp_soft/conda/anaconda3/bin/activate /opt/exp_soft/conda/anaconda3
 conda activate /mnt/home/groups/nmrl/cov_analysis/SARS-CoV2_assembly/tools/rbase_env
 
 MUTATION_FILES='/mnt/home/groups/nmrl/cov_analysis/mutation_heatmap/mutation_files'
