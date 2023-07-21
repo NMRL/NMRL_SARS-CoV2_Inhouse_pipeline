@@ -5,7 +5,6 @@
 # SSH copy: https://github.com/marketplace/actions/copy-via-ssh
 # Encrypted secrets: https://docs.github.com/en/actions/security-guides/encrypted-secrets
 
-
 name: Trigger pangolin image update based on push to snakemake/pangolin_update.log
 
 on:
@@ -30,8 +29,8 @@ jobs:
       - name: Copy single file to remote
         uses: garygrossgarten/github-action-scp@release
         with:
-          local: /home/runner/work/SARS-CoV2-pipe/SARS-CoV2-pipe/pangolin.sif
-          remote: ${{ secrets.HOST_IMAGES }}pangolin.sif
           host: ${{ secrets.HPC_HOST }}
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASS }}
+          local: /home/runner/work/SARS-CoV2-pipe/SARS-CoV2-pipe/pangolin.sif
+          remote: ${{ secrets.HOST_IMAGES }}pangolin.sif
