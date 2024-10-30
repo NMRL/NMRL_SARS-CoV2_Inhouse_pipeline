@@ -8,7 +8,7 @@ From: continuumio/miniconda3
 	apt-get -y update
         git clone https://github.com/cov-lineages/pangolin
         cd pangolin
-	sed -i "$(grep -n 'python>=3.7' environment.yml | cut -f1 -d:)d" environment.yml && \
+	sed -i 's/python>=3.7/python==3.8.19/' environment.yml && \
 	sed -i "$(grep -n 'pip=' environment.yml | cut -f1 -d:)d" environment.yml
         /opt/conda/bin/conda env create -f environment.yml
 	PATH=/opt/conda/envs/pangolin/bin:$PATH
